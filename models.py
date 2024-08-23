@@ -168,6 +168,32 @@ class DQNAgent:
         state = np.array([state[0], state[1], np.cos(state[2]), np.sin(state[2]), state[3]]) # Convert angle to sin and cos
         state = np.reshape(state, (1,5)) # Reshape to (1,5)
         return state
+    
+    def train(self, env, config):
+        dt = config.run.dt # Time step in seconds
+        num_episodes = config.run.num_episodes # Number of episodes to run
+        episode_time = config.run.episode_time # Maximum episode time in seconds
+        batch_size = config.run.batch_size # Mini-batch size for training
+        episode_steps = int(episode_time/dt) # Number of time steps in an episode
+
+        for e in range(num_episodes):
+            state = env.reset() # Reset the environment
+            state = self.get_state_representation(state) # Get state representation
+            
+            for time_step in range(episode_steps):
+                action = self.act(state) # Get action from agent
+                next_state, reward, done = env.step(action, dt) # Take action in environment
+                next_state = self.get_state_representation(next_state) # Get state representation
+                reward = reward if not done else config.model.termination_penalty # Penalize termination
+                self.remember(state, action, reward, next_state, done) # Add transition to memory
+                if done:
+                    print(f"episode: {e}/{num_episodes}, score: {time_step}, eps: {self.eps:.2}")
+                    break
+                if len(self.memory) > batch_size: # Train agent
+                    self.replay(batch_size)
+                state = next_state
+            if config.model.save_weights.enable:
+                self.save(os.path.join('weights', config.model.save_weights.file_name))
 
 
     def load_weights(self, filepath):

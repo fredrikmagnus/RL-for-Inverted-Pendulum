@@ -53,31 +53,8 @@ elif model_type == 'DQN':
         agent.load_weights(weights_path)
 
 
-
-
 if run_type == 'train': # Run the training loop
-    if model_type == 'REINFORCE':
-        agent.train(env, config)
-
-    elif model_type == 'DQN':
-        for e in range(num_episodes):
-            state = env.reset() # Reset the environment
-            state = agent.get_state_representation(state) # Get state representation
-            
-            for time_step in range(episode_steps):
-                action = agent.act(state)
-                next_state, reward, done = env.step(action, dt)
-                next_state = agent.get_state_representation(next_state)
-                reward = reward if not done else -5
-                agent.remember(state, action, reward, next_state, done) # TODO: Adjust angle to be close to 0 instead of pi/2, maybe this will help
-                if done:
-                    print(f"episode: {e}/{num_episodes}, score: {time_step}, eps: {agent.eps:.2}")
-                    break
-                if len(agent.memory) > batch_size:
-                    agent.replay(batch_size)
-                state = next_state
-            if config.model.save_weights.enable:
-                agent.save(os.path.join('weights', config.model.save_weights.file_name))
+    agent.train(env, config)
 
 elif run_type == 'test': # Run test
     env.reset()
