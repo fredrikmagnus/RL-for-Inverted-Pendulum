@@ -55,27 +55,28 @@ class Pendulum:
     #     return 1
     
     def reward(self):
-        rmax_theta = 1
-        rmin_theta = .5
-        theta0 = np.pi/2
-        dtheta = self.angle_lim
-        thetamin = np.pi/2-dtheta
-        a_theta = (rmax_theta-rmin_theta)/(theta0**2 - 2*thetamin*theta0 + thetamin**2)
-        b_theta = -2*a_theta*thetamin
-        c_theta = a_theta*thetamin**2 + rmin_theta
-        theta = self.state[4]
-        r_theta = a_theta*theta**2 + b_theta*theta + c_theta if theta<=np.pi/2 else a_theta*(theta-2*dtheta)**2 + b_theta*(theta-2*dtheta) + c_theta
+        # rmax_theta = 1
+        # rmin_theta = .5
+        # theta0 = np.pi/2
+        # dtheta = self.angle_lim
+        # thetamin = np.pi/2-dtheta
+        # a_theta = (rmax_theta-rmin_theta)/(theta0**2 - 2*thetamin*theta0 + thetamin**2)
+        # b_theta = -2*a_theta*thetamin
+        # c_theta = a_theta*thetamin**2 + rmin_theta
+        # theta = self.state[4]
+        # r_theta = a_theta*theta**2 + b_theta*theta + c_theta if theta<=np.pi/2 else a_theta*(theta-2*dtheta)**2 + b_theta*(theta-2*dtheta) + c_theta
 
-        rmax_x = .3
-        rmin_x = -.2
-        dx = self.x_lim
-        a1=(rmax_x-rmin_x)/dx
-        a2=-a1
-        b=rmax_x
-        x = self.state[0]
-        r_pos =  a1*x+b if x<= 0 else a2*x+b
+        # rmax_x = .3
+        # rmin_x = -.2
+        # dx = self.x_lim
+        # a1=(rmax_x-rmin_x)/dx
+        # a2=-a1
+        # b=rmax_x
+        # x = self.state[0]
+        # r_pos =  a1*x+b if x<= 0 else a2*x+b
 
-        return r_theta+r_pos
+        # return r_theta+r_pos
+        return 1
     
     def step(self, action, dt):
         """ Returns: state, reward, done """
