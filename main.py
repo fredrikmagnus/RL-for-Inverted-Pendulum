@@ -57,40 +57,7 @@ elif model_type == 'DQN':
 
 if run_type == 'train': # Run the training loop
     if model_type == 'REINFORCE':
-        for e in range(num_episodes):
-            state = env.reset() # Reset the environment
-            state = agent.get_state_representation(state) # Get state representation
-            
-            ep = [] # List of tuples (state, action, reward)
-            for time_step in range(episode_steps): # Play episode
-                action = agent.act(state) # Get action from agent
-                next_state, reward, done = env.step(action, dt) # Take action in environment
-                next_state = agent.get_state_representation(next_state) # Get state representation
-                reward = reward if not done else -5 # Penalize termination
-                ep.append((state, action, reward)) # Add state, action, reward to episode history
-                if done:
-                    print(f"episode: {e}/{num_episodes}, score: {time_step}")
-                    break
-                state = next_state # Update state
-            
-            # Compute G for each time step in episode
-            R = [reward for state, action, reward in ep]
-            G = 0
-            for i, r in enumerate(R[::-1]):
-                i = len(R)-i-1 # Reverse index
-                G = r+agent.gamma*G # Discounted reward
-                ep[i] = (ep[i][0], ep[i][1], ep[i][2], G, i) # Replace reward with G and add time step
-
-            for state, action, reward, G, time_step in ep: # Add episode to memory
-                agent.remember(state, action, reward, G, time_step)
-
-            if len(agent.memory) > batch_size:
-                for i in range(len(agent.memory)//batch_size):
-                    agent.replay(batch_size)
-
-            if config.model.save_weights.enable: # Save weights
-                if e%config.model.save_weights.save_frequency == 0 and e != 0:
-                    agent.save(os.path.join('weights', config.model.save_weights.file_name))
+        agent.train(env, config)
 
     elif model_type == 'DQN':
         for e in range(num_episodes):

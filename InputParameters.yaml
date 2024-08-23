@@ -1,22 +1,24 @@
 run:
-  type: test # train or test
+  type: train # train or test
   num_episodes: 1000 # Number of episodes to run
   episode_time: 25 # Maximum episode time in seconds
   dt: 0.025 # Time step in seconds
   batch_size: 32 # Mini-batch size for training
 
 model:
-  type: DQN # DQN or REINFORCE
+  type: REINFORCE # DQN or REINFORCE
   discount_factor: 0.99 # Discount factor for future rewards
   learning_rate: 0.001 # Learning rate for the optimizer
   layer_sizes: [20, 20] # Number of neurons in each layer
 
+  termination_penalty: -5 # Penalty for terminating the episode early
+
   init_from_weights:
     enable: true
-    file_name: "Layer2020_F2025.h5"
+    file_name: "weights.h5"
   save_weights:
     enable: true
-    file_name: "testDQN.h5"
+    file_name: "weights.h5"
     save_frequency: 50 # Save weights every n episodes
 
   DQN_params:

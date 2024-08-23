@@ -21,6 +21,7 @@ class ModelParams(BaseModel):
     discount_factor: float = Field(0.99, description="Discount factor for future rewards.")
     learning_rate: float = Field(0.001, description="Learning rate for the optimizer.")
     layer_sizes: List[int] = Field([20, 20], description="List specifying the number of neurons in each layer.")
+    termination_penalty: float = Field(-5, description="Penalty for termination.")
 
     init_from_weights: InitFromWeights = InitFromWeights()
     save_weights: SaveWeights = SaveWeights()
