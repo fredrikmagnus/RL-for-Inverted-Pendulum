@@ -6,19 +6,19 @@ run:
   batch_size: 32 # Mini-batch size for training
 
 model:
-  type: DQN # DQN or REINFORCE
+  type: REINFORCE # DQN or REINFORCE
   discount_factor: 0.99 # Discount factor for future rewards
   learning_rate: 0.001 # Learning rate for the optimizer
   layer_sizes: [20, 20] # Number of neurons in each layer
 
   termination_penalty: -5 # Penalty for terminating the episode early
 
-  init_from_weights:
-    enable: true
-    file_name: "weights.h5"
+  init_from_weights: 
+    enable: true # Initialize model from weights
+    file_name: "test.h5" # File name to load weights from
   save_weights:
-    enable: true
-    file_name: "weights.h5"
+    enable: true # Save weights to file
+    file_name: "test.h5" # File name to save weights to
     save_frequency: 50 # Save weights every n episodes
 
   DQN_params:

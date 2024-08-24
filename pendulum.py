@@ -76,7 +76,11 @@ class Pendulum:
         # r_pos =  a1*x+b if x<= 0 else a2*x+b
 
         # return r_theta+r_pos
-        return 1
+        # return 1
+        x = self.state[0]
+        x_lim = self.x_lim
+        reward = 1 - abs(x) / x_lim
+        return max(reward, 0)
     
     def step(self, action, dt):
         """ Returns: state, reward, done """

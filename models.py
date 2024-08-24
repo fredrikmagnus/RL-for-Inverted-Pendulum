@@ -7,15 +7,7 @@ from keras.optimizers import Adam
 from collections import deque
 import os
 
-def custom_loss(y_true, y_pred):
-    # We now redefine the loss-function to avoid having to store the rewards in a class.
-    # We can do this by incorporating the reward and gamma^t in the y_true vector.
-    # Earlier we had y_true as a vector of the one-hot encoding of the selected actions. 
-    # y_true was then multiplied by G*gamma^t. We now multiply G*gamma^t with y_true before passing it to the loss function.
-    y_pred_clipped = tf.clip_by_value(y_pred, 1e-7, 1-1e-7) 
-    log_probs = y_true * tf.math.log(y_pred_clipped) # Log(pi(s)) * G*gamma^t (one-hot-encoded for the selected action)
 
-    return -tf.reduce_sum(log_probs)
 
 class REINFORCEAgent:
     def __init__(self, state_shape, action_size, hidden_layer_sizes, discount_factor, learning_rate) -> None:
@@ -27,13 +19,23 @@ class REINFORCEAgent:
         self.gamma = discount_factor # Discount rate
         self.model = self.build_model(state_shape, action_size, hidden_layer_sizes, learning_rate)
 
+    def custom_loss(self, y_true, y_pred):
+        # We now redefine the loss-function to avoid having to store the rewards in a class.
+        # We can do this by incorporating the reward and gamma^t in the y_true vector.
+        # Earlier we had y_true as a vector of the one-hot encoding of the selected actions. 
+        # y_true was then multiplied by G*gamma^t. We now multiply G*gamma^t with y_true before passing it to the loss function.
+        y_pred_clipped = tf.clip_by_value(y_pred, 1e-7, 1-1e-7) 
+        log_probs = y_true * tf.math.log(y_pred_clipped) # Log(pi(s)) * G*gamma^t (one-hot-encoded for the selected action)
+
+        return -tf.reduce_sum(log_probs)
+
     def build_model(self, state_shape, action_size, hidden_layer_sizes, learning_rate):
         model = Sequential()
         model.add(Dense(hidden_layer_sizes[0], activation='relu', input_shape = state_shape))
         for layer_size in hidden_layer_sizes[1:]:
             model.add(Dense(layer_size, activation='relu'))
         model.add(Dense(action_size, activation='softmax'))
-        model.compile(loss=custom_loss, optimizer=Adam(learning_rate=learning_rate))
+        model.compile(loss=self.custom_loss, optimizer=Adam(learning_rate=learning_rate))
         return model
     
     def remember(self, state, action, reward, G, time_step):
@@ -44,22 +46,14 @@ class REINFORCEAgent:
         return np.random.choice(np.arange(len(act_probs)), p=act_probs)
     
     def replay(self, batch_size):
-        minibatch = random.sample(self.memory, batch_size)
+        minibatch = random.sample(self.memory, batch_size) # Sample a mini-batch from memory
         print("Running replay...")
-        states = np.zeros((len(minibatch), self.state_shape[0]))
-        # actions = np.zeros((len(minibatch), self.action_size))
-        # discounted_rewards = np.zeros((len(minibatch),1))
-        # time_steps = np.zeros((len(minibatch),1))
-        y_true = np.zeros((len(minibatch), self.action_size))
-        for i, (state, action, reward, G, time_step) in enumerate(minibatch):
-            states[i] = state
-            y_true[i][action] = G*tf.math.pow(self.gamma, time_step)
-            # actions[i][action] = 1
-            # discounted_rewards[i][0] = G
-            # time_steps[i][0] = time_step
-        # self.loss_instance.discounted_rewards = discounted_rewards
-        # self.loss_instance.time_steps = time_steps
-        self.model.fit(states, y_true, verbose = 0)
+        states = np.zeros((len(minibatch), self.state_shape[0]))  # Create array to store states
+        y_true = np.zeros((len(minibatch), self.action_size)) # Create array to store y_true
+        for i, (state, action, reward, G, time_step) in enumerate(minibatch): # Loop over mini-batch
+            states[i] = state # Add state to states
+            y_true[i][action] = G*tf.math.pow(self.gamma, time_step) # Multiply G*gamma^t with one-hot-encoded action
+        self.model.fit(states, y_true, verbose = 0) # Update weights
 
     def get_state_representation(self, state):
         state = state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
