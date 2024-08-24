@@ -1,25 +1,25 @@
 run:
-  type: test # train or test
+  type: train # train or test
   num_episodes: 1000 # Number of episodes to run
   episode_time: 25 # Maximum episode time in seconds
   dt: 0.025 # Time step in seconds
-  batch_size: 32 # Mini-batch size for training
+  batch_size: 16 # Mini-batch size for training
 
 model:
-  type: REINFORCE # DQN or REINFORCE
+  type: REINFORCE # DQN, REINFORCE or ActorCritic
   discount_factor: 0.99 # Discount factor for future rewards
-  learning_rate: 0.001 # Learning rate for the optimizer
-  layer_sizes: [20, 20] # Number of neurons in each layer
+  learning_rate: 1e-3 # Learning rate for the optimizer
+  layer_sizes: [10, 10] # Number of neurons in each layer
 
   termination_penalty: -5 # Penalty for terminating the episode early
 
   init_from_weights: 
-    enable: true # Initialize model from weights
-    file_name: "test.h5" # File name to load weights from
+    enable: false # Initialize model from weights
+    file_name: "AC.h5" # File name to load weights from
   save_weights:
     enable: true # Save weights to file
-    file_name: "test.h5" # File name to save weights to
-    save_frequency: 50 # Save weights every n episodes
+    file_name: "AC.h5" # File name to save weights to
+    save_frequency: 2 # Save weights every n episodes
 
   DQN_params:
     epsilon_init: 1 # Initial epsilon value (for epsilon-greedy policy)

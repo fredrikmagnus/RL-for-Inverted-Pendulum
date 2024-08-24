@@ -1,6 +1,6 @@
 
 from pendulum import Pendulum
-from models import REINFORCEAgent, DQNAgent
+from models import REINFORCEAgent, DQNAgent, ActorCritic
 import numpy as np
 import matplotlib.pyplot as plt
 from keras.utils import custom_object_scope
@@ -47,6 +47,13 @@ if model_type == 'REINFORCE':
 
 elif model_type == 'DQN':
     agent = DQNAgent((5,), 2, hidden_layer_sizes, discount_factor, learning_rate, epsilon_init, epsilon_min, epsilon_decay)
+    # Load initial weights if specified
+    if config.model.init_from_weights.enable:
+        weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
+        agent.load_weights(weights_path)
+
+elif model_type == 'ActorCritic':
+    agent = ActorCritic(config)
     # Load initial weights if specified
     if config.model.init_from_weights.enable:
         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)

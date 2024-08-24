@@ -42,7 +42,8 @@ class Pendulum:
 
         x_pos = random.uniform(-self.x_lim/3, self.x_lim/3)
         x_vel = random.uniform(-x_vel_lim, x_vel_lim)
-        angle = random.uniform(-self.angle_lim/2 + np.pi/2, self.angle_lim/2+ np.pi/2)
+        angle = random.uniform(-self.angle_lim/2 + np.pi/2, self.angle_lim/2+ np.pi/2) # Start at upright position
+        # angle = -np.pi/2 # Start at bottom
         angle_vel = random.uniform(-angle_vel_lim, angle_vel_lim)
 
         self.state = np.array([x_pos, 0, x_vel, 0, angle, angle_vel]) #(x_pos, y_pos, x_vel, y_vel, angle, ang_vel)
@@ -77,10 +78,18 @@ class Pendulum:
 
         # return r_theta+r_pos
         # return 1
+
         x = self.state[0]
         x_lim = self.x_lim
         reward = 1 - abs(x) / x_lim
         return max(reward, 0)
+
+        # # Reward for swinging up
+        # angle = self.state[4]
+        # R1 = np.sin(angle) # Reward for upright position
+        # x_pos = self.state[0]
+        # R2 = -0.5*np.abs(x_pos/self.x_lim) # Reward for being close to center
+        # return R1 + R2 +1 # Total reward
     
     def step(self, action, dt):
         """ Returns: state, reward, done """
@@ -95,9 +104,10 @@ class Pendulum:
         # Check termination:
         abs_pos = np.abs(self.state[0])
         abs_angle = np.abs(self.state[4]-np.pi/2)
-        if abs_pos > self.x_lim or abs_angle > self.angle_lim:
+        if abs_pos > self.x_lim or abs_angle > self.angle_lim: # Terminate if outside limits
             self.terminated = True
-
+        # if abs_pos > self.x_lim: # Terminates if outside x limits
+        #     self.terminated = True
         return self.state, self.reward(), self.terminated # New-state, reward, done
     
     def animate(self, agent):
