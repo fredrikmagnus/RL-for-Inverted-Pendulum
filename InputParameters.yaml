@@ -6,12 +6,12 @@ run:
   batch_size: 16 # Mini-batch size for training
 
 model:
-  type: REINFORCE # DQN, REINFORCE or ActorCritic
-  discount_factor: 0.99 # Discount factor for future rewards
-  learning_rate: 1e-3 # Learning rate for the optimizer
-  layer_sizes: [10, 10] # Number of neurons in each layer
+  type: ActorCritic # DQN, REINFORCE or ActorCritic
+  discount_factor: 0.95 # Discount factor for future rewards
+  learning_rate: 1e-4 # Learning rate for the optimizer
+  layer_sizes: [16, 16] # Number of neurons in each layer
 
-  termination_penalty: -5 # Penalty for terminating the episode early
+  termination_penalty: -2 # Penalty for terminating the episode early
 
   init_from_weights: 
     enable: false # Initialize model from weights
@@ -19,7 +19,7 @@ model:
   save_weights:
     enable: true # Save weights to file
     file_name: "AC.h5" # File name to save weights to
-    save_frequency: 2 # Save weights every n episodes
+    save_frequency: 5 # Save weights every n episodes
 
   DQN_params:
     epsilon_init: 1 # Initial epsilon value (for epsilon-greedy policy)

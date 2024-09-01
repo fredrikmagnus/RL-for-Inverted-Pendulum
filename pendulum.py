@@ -8,7 +8,7 @@ class Pendulum:
         self.m1 = m1 # Mass of the base
         self.m2 = m2 # Mass of the pendulum
         self.x_lim = 7 # min/max x_pos
-        self.angle_lim = np.pi/12 # min/max angle
+        self.angle_lim = np.pi/6 # min/max angle
         self.state = None # State vector (x_pos, y_pos, x_vel, y_vel, angle, ang_vel)
         self.terminated = False
 
@@ -34,20 +34,24 @@ class Pendulum:
         
         self.state[4] = self.state[4] % (2*np.pi) # Keep angle between 0 and 2pi
 
-    def reset(self):
-        # Sets a random initial state which is returned
-        # For this example the necessary state-variables is x-pos, x-vel, angle and angle-vel
-        x_vel_lim = 2 # The velocity can be between +- 2m/s
-        angle_vel_lim = 0.3 # min/max angle vel
+    def reset(self, deterministic=False):
+        if deterministic:
+            self.state = np.array([0, 0, 0, 0, np.pi/2, 0])
+            self.terminated = False
+        else:
+            # Sets a random initial state which is returned
+            # For this example the necessary state-variables is x-pos, x-vel, angle and angle-vel
+            x_vel_lim = 2 # The velocity can be between +- 2m/s
+            angle_vel_lim = 0.3 # min/max angle vel
 
-        x_pos = random.uniform(-self.x_lim/3, self.x_lim/3)
-        x_vel = random.uniform(-x_vel_lim, x_vel_lim)
-        angle = random.uniform(-self.angle_lim/2 + np.pi/2, self.angle_lim/2+ np.pi/2) # Start at upright position
-        # angle = -np.pi/2 # Start at bottom
-        angle_vel = random.uniform(-angle_vel_lim, angle_vel_lim)
+            x_pos = random.uniform(-self.x_lim/3, self.x_lim/3)
+            x_vel = random.uniform(-x_vel_lim, x_vel_lim)
+            angle = random.uniform(-self.angle_lim/3 + np.pi/2, self.angle_lim/3 + np.pi/2) # Start at upright position
+            # angle = -np.pi/2 # Start at bottom
+            angle_vel = random.uniform(-angle_vel_lim, angle_vel_lim)
 
-        self.state = np.array([x_pos, 0, x_vel, 0, angle, angle_vel]) #(x_pos, y_pos, x_vel, y_vel, angle, ang_vel)
-        self.terminated = False
+            self.state = np.array([x_pos, 0, x_vel, 0, angle, angle_vel]) #(x_pos, y_pos, x_vel, y_vel, angle, ang_vel)
+            self.terminated = False
         
         return self.state
     

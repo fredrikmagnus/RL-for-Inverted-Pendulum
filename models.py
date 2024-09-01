@@ -3,8 +3,11 @@ import random
 import tensorflow as tf
 from keras.models import Sequential, load_model
 from keras.layers import Dense
+from keras.models import Model
+from keras.layers import Input, Dense
 from keras.optimizers import Adam
 from collections import deque
+from keras.losses import MeanSquaredError
 import os
 
 class DQNAgent:
@@ -209,6 +212,12 @@ class ActorCritic:
         self.gamma = config.model.discount_factor
         self.critic = self.build_critic(self.state_shape, self.hidden_layer_sizes, self.learning_rate)
         self.actor = self.build_actor(self.state_shape, self.action_size, self.hidden_layer_sizes, self.learning_rate*1e-1)
+         
+        # Eligibility traces
+        self.eligibility_traces = True
+        self.trace_decay = 0.9
+        self.actor_eligibility_trace = [tf.zeros_like(weight) for weight in self.actor.trainable_weights]
+        self.critic_eligibility_trace = [tf.zeros_like(weight) for weight in self.critic.trainable_weights]
 
     def build_critic(self, state_shape, hidden_layer_sizes, learning_rate):
         model = Sequential()
@@ -286,29 +295,75 @@ class ActorCritic:
         episode_time = config.run.episode_time
         episode_steps = int(episode_time/dt)
 
-        mini_batch_enable = True
+        mini_batch_enable = False
 
         for e in range(num_episodes):
-            state = env.reset()
+            state = env.reset(deterministic=False)
             state = self.get_state_representation(state)
             I = 1 # Importance sampling ratio
 
             for time_step in range(episode_steps):
-                action = self.act(state)
+                # action = self.act(state)
+                policy = self.actor.predict(state, verbose=0)
+                action = np.random.choice(np.arange(len(policy[0])), p=policy[0])
+
                 next_state, reward, done = env.step(action, dt)
+                # print(f"angle: {next_state[4]*180/np.pi}, state: {next_state}, done: {done}")
                 next_state = self.get_state_representation(next_state)
                 reward = reward if not done else config.model.termination_penalty
-
 
                 if mini_batch_enable:
                     self.remember(state, action, reward, next_state, done)
                     self.replay(config.run.batch_size)   
+                elif self.eligibility_traces:
+
+                    # Compute the target for the critic
+                    target = tf.convert_to_tensor(reward + self.gamma * self.critic(next_state, training=False), dtype=tf.float32)
+
+                    # Compute the advantage for the actor
+                    current_state_value = tf.convert_to_tensor(self.critic(state, training=False), dtype=tf.float32)
+                    advantage = target - current_state_value  # Advantage
+
+                    y_true = np.zeros((1, self.action_size))
+                    y_true[0][action] = I * advantage 
+                    y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
+
+                    # Compute gradient of the critic
+                    with tf.GradientTape() as tape:
+                        # Forward pass using the call method
+                        current_state_value = self.critic(state, training=True)
+                        critic_loss = MeanSquaredError()(target, current_state_value) # Compute the loss for the critic
+                    critic_grads = tape.gradient(critic_loss, self.critic.trainable_weights) # Compute the gradient of the loss w.r.t. the critic weights
+                    print(f"critic_loss: {critic_loss}, grads: {critic_grads}")
+                    # self.critic_eligibility_trace = self.gamma * self.trace_decay * self.critic_eligibility_trace + critic_grads # Update the eligibility trace for the critic
+                    # Update the critic eligibility trace, but only if the gradients are not None
+                    self.critic_eligibility_trace = [
+                        self.gamma * self.trace_decay * trace + advantage*grad if grad is not None else trace
+                        for trace, grad in zip(self.critic_eligibility_trace, critic_grads)
+                    ]
+                    self.critic.optimizer.apply_gradients(zip(self.critic_eligibility_trace, self.critic.trainable_weights)) # Update the critic weights
+                    # Update the actor using the advantage
+                    # Compute gradient of the actor
+                    with tf.GradientTape() as tape:
+                        actor_loss = self.custom_actor_loss(y_true, policy)
+                    actor_grads = tape.gradient(actor_loss, self.actor.trainable_weights)
+                    print(f"actor_loss: {actor_loss}, grads: {actor_grads}")
+                    # self.actor_eligibility_trace = self.gamma * self.trace_decay * self.actor_eligibility_trace + actor_grads
+                    # Update the actor eligibility trace, but only if the gradients are not None
+                    self.actor_eligibility_trace = [
+                        self.gamma * self.trace_decay * trace + advantage*grad if grad is not None else trace
+                        for trace, grad in zip(self.actor_eligibility_trace, actor_grads)
+                    ]
+                    self.actor.optimizer.apply_gradients(zip(self.actor_eligibility_trace, self.actor.trainable_weights))
+
+
                 else:
                     # Compute the target for the critic
                     target = reward + self.gamma * self.critic.predict(next_state, verbose=0) # TD-target
                     # Compute the advantage for the actor
                     advantage = target - self.critic.predict(state, verbose=0) # Advantage
 
+                    # print(f"G: {G}, done: {done}")
                     # Update the critic using the target value
                     self.critic.fit(state, target, verbose=0)
 
@@ -341,4 +396,114 @@ class ActorCritic:
         self.critic.load_weights(critic_filepath)
 
     
+
+# class ActorCritic:
+#     def __init__(self, config) -> None:
+#         self.state_shape = (5,)
+#         self.action_size = 2
+#         self.hidden_layer_sizes = config.model.layer_sizes
+#         self.learning_rate = config.model.learning_rate
+#         self.gamma = config.model.discount_factor
+#         self.model = self.build_shared_network(self.state_shape, self.action_size, self.hidden_layer_sizes, self.learning_rate)
+
+#     def build_shared_network(self, state_shape, action_size, hidden_layer_sizes, learning_rate):
+#         # Shared input and hidden layers
+#         input_layer = Input(shape=state_shape)
+#         hidden = Dense(hidden_layer_sizes[0], activation='relu')(input_layer)
+#         for layer_size in hidden_layer_sizes[1:]:
+#             hidden = Dense(layer_size, activation='relu')(hidden)
+
+#         # Separate policy head
+#         policy_hidden = Dense(8, activation='relu')(hidden)
+#         policy_hidden = Dense(8, activation='relu')(policy_hidden)
+#         policy_output = Dense(action_size, activation='softmax', name='policy_output')(policy_hidden)
+
+#         # Separate value head
+#         value_hidden = Dense(8, activation='relu')(hidden)
+#         value_hidden = Dense(8, activation='relu')(value_hidden)
+#         value_output = Dense(1, activation='linear', name='value_output')(value_hidden)
+
+#         # Define the model with two outputs
+#         model = Model(inputs=input_layer, outputs=[policy_output, value_output])
+#         model.compile(
+#             optimizer=Adam(learning_rate=learning_rate),
+#             loss={'policy_output': self.custom_actor_loss, 'value_output': 'mse'}
+#         )
+#         return model
+    
+#     def custom_actor_loss(self, y_true, y_pred):
+#         y_pred_clipped = tf.clip_by_value(y_pred, 1e-7, 1-1e-7)
+#         log_probs = y_true * tf.math.log(y_pred_clipped)
+#         return -tf.reduce_sum(log_probs)
+
+#     def act(self, state):
+#         policy, _ = self.model.predict(state, verbose=0)
+#         return np.random.choice(np.arange(len(policy[0])), p=policy[0])
+    
+#     def get_state_representation(self, state):
+#         state = state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
+#         state = np.array([state[0], state[1], np.cos(state[2]), np.sin(state[2]), state[3]])
+#         state = np.reshape(state, (1, 5))
+#         return state
+    
+#     def train(self, env, config):
+#         dt = config.run.dt
+#         num_episodes = config.run.num_episodes
+#         episode_time = config.run.episode_time
+#         episode_steps = int(episode_time/dt)
+
+#         for e in range(num_episodes):
+#             state = env.reset()
+#             state = self.get_state_representation(state)
+#             I = 1 # Importance sampling ratio
+#             cumul_reward = 0
+#             for time_step in range(episode_steps):
+#                 policy, value_current = self.model.predict(state, verbose=0) # Predict the current value and policy
+#                 print(f"policy: {policy}, value_current: {value_current}")
+#                 action = np.random.choice(np.arange(len(policy[0])), p=policy[0]) # Sample action from policy
+
+#                 next_state, reward, done = env.step(action, dt)
+#                 next_state = self.get_state_representation(next_state)
+#                 reward = reward if not done else config.model.termination_penalty
+#                 cumul_reward *= self.gamma
+#                 cumul_reward += reward
+
+#                 # Predict the value of the next state
+#                 _, value_next = self.model.predict(next_state, verbose=0)
+
+#                 # Compute the target for the value head
+#                 target = reward + self.gamma * value_next
+
+#                 # Compute the advantage
+#                 advantage = target - value_current 
+
+#                 # Prepare y_true for the actor update
+#                 y_true_policy = np.zeros((1, self.action_size))
+#                 y_true_policy[0][action] = I * advantage
+
+#                 # Make a single call to fit to update both heads simultaneously
+#                 self.model.fit(state, {'policy_output': y_true_policy, 'value_output': target}, verbose=0)
+
+
+#                 if done:
+#                     print(f"episode: {e}/{num_episodes}, score: {time_step}")
+#                     # Print total cumulative reward
+#                     print(f"Total cumulative reward: {cumul_reward}")
+#                     break
+
+#                 I *= self.gamma
+#                 state = next_state
+
+#             if config.model.save_weights.enable:
+#                 if e % config.model.save_weights.save_frequency == 0 and e != 0:
+#                     self.save(os.path.join('weights', config.model.save_weights.file_name))
+
+    
+
+#     def save(self, filepath):
+#         self.model.save_weights(filepath)
+
+#     def load_weights(self, filepath):
+#         self.model.load_weights(filepath)
+
 

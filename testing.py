@@ -1,11 +1,9 @@
-
 from pendulum import Pendulum
 from models import REINFORCEAgent, DQNAgent, ActorCritic
 import numpy as np
 import matplotlib.pyplot as plt
 from keras.utils import custom_object_scope
 import os
-
 from dataModels import Config, read_data_from_yaml
 
 config = read_data_from_yaml('InputParameters.yaml', Config)
@@ -59,15 +57,82 @@ elif model_type == 'ActorCritic':
         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
         agent.load_weights(weights_path)
 
+def run_episode(env, agent):
+    states = []
+    policies = []
+    values = []
 
-if run_type == 'train': # Run the training loop
-    agent.train(env, config)
+    state = env.reset(deterministic=True)
+    state = agent.get_state_representation(state)
 
-elif run_type == 'test': # Run test
-    env.reset()
-    env.animate(agent)
+    done = False
+    while not done:
+        
+        
+        # Get the policy and value from the agent's model
+        policy, value = agent.model.predict(state, verbose=0)
+        
+        # Store the policy and value
+        policies.append(policy[0])  # Store the policy (action probabilities)
+        values.append(value[0])  # Store the value prediction
+        
+        # Choose an action based on the policy
+        action = np.random.choice(np.arange(len(policy[0])), p=policy[0])
+        
+        # Take the action in the environment
+        next_state, reward, done = env.step(action, dt=dt)
+        
+        # Store the current state
+        states.append(next_state.copy())
+        next_state = agent.get_state_representation(next_state)
+        
+        # Update the current state
+        state = next_state
+
+        # Break the loop if the episode is done
+        if done:
+            break
+    
+    return states, policies, values
+
+# states, policies, values = run_episode(env, agent)
+
+
+
+# angle = [state[4]*1.80/np.pi for state in states]
+# x_pos = [state[0] for state in states]
+
+# # Plot the angle and value prediction over time
+# plt.figure()
+# plt.plot(angle, label='Angle')
+# plt.plot(np.sin(angle), label='Angle sin')
+# plt.plot(x_pos, label='X position')
+# plt.plot(values, label='Value')
+# plt.xlabel('Time step')
+# plt.ylabel('Angle/Value')
+# plt.legend()
+# plt.show()
 
 
 
 
+# Plot the actor critic value function as a function of the angle
+def plot_value_function(agent):
+    angle = np.linspace(0, np.pi, 100)
+    value = np.zeros_like(angle)
+    for i, a in enumerate(angle):
+        state = np.array([0, 0, np.cos(a), np.sin(a), 0])
+        state = np.reshape(state, (1, 5))
+        if model_type == 'ActorCritic':
+            # _, value[i] = agent.model.predict(state, verbose=0)
+            value[i] = agent.critic.predict(state, verbose=0)
+        elif model_type == 'DQN':
+            value[i] = np.max(agent.model.predict(state, verbose=0))
+            print(value[i])
+    plt.plot(angle, value)
+    plt.xlabel('Angle (rad)')
+    plt.ylabel('Value')
+    plt.title('Value function')
+    plt.show()
 
+plot_value_function(agent)
