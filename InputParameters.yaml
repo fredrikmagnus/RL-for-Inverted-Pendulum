@@ -1,25 +1,25 @@
 run:
-  type: train # train or test
+  type: test # train or test
   num_episodes: 1000 # Number of episodes to run
   episode_time: 25 # Maximum episode time in seconds
   dt: 0.025 # Time step in seconds
   batch_size: 16 # Mini-batch size for training
 
 model:
-  type: ActorCritic # DQN, REINFORCE or ActorCritic
+  type: DDPG # DQN, REINFORCE or DDPG
   discount_factor: 0.95 # Discount factor for future rewards
   learning_rate: 1e-4 # Learning rate for the optimizer
   layer_sizes: [16, 16] # Number of neurons in each layer
 
-  termination_penalty: -2 # Penalty for terminating the episode early
+  termination_penalty: -3 # Penalty for terminating the episode early
 
   init_from_weights: 
-    enable: false # Initialize model from weights
-    file_name: "AC.h5" # File name to load weights from
+    enable: True # Initialize model from weights
+    file_name: "DDPG.keras" # File name to load weights from
   save_weights:
     enable: true # Save weights to file
-    file_name: "AC.h5" # File name to save weights to
-    save_frequency: 5 # Save weights every n episodes
+    file_name: "DDPG.keras" # File name to save weights to
+    save_frequency: 10 # Save weights every n episodes
 
   DQN_params:
     epsilon_init: 1 # Initial epsilon value (for epsilon-greedy policy)

@@ -17,7 +17,7 @@ class DQNParams(BaseModel):
     epsilon_decay: float = Field(0.995, description="Epsilon decay rate.")
 
 class ModelParams(BaseModel):
-    type: str = Field("REINFORCE", description="Type of model to use, either 'REINFORCE', 'DQN' or 'ActorCritic'.")
+    type: str = Field("REINFORCE", description="Type of model to use, either 'REINFORCE', 'DQN' or 'DDPG'.")
     discount_factor: float = Field(0.99, description="Discount factor for future rewards.")
     learning_rate: float = Field(0.001, description="Learning rate for the optimizer.")
     layer_sizes: List[int] = Field([20, 20], description="List specifying the number of neurons in each layer.")
@@ -30,8 +30,8 @@ class ModelParams(BaseModel):
     
     @validator('type')
     def validate_model_type(cls, v):
-        if v not in ['REINFORCE', 'DQN', 'ActorCritic']:
-            raise ValueError('type must be either "REINFORCE" or "DQN"')
+        if v not in ['REINFORCE', 'DQN', 'DDPG']:
+            raise ValueError('type must be either "REINFORCE", "DQN" or "DDPG"')
         return v
 
 class RunParams(BaseModel):

@@ -1,10 +1,8 @@
 import numpy as np
 import random
 import tensorflow as tf
-from keras.models import Sequential, load_model
-from keras.layers import Dense
-from keras.models import Model
-from keras.layers import Input, Dense
+from keras.models import Sequential, load_model, Model
+from keras.layers import Dense, Concatenate, Input
 from keras.optimizers import Adam
 from collections import deque
 from keras.losses import MeanSquaredError
@@ -198,312 +196,171 @@ class REINFORCEAgent:
 
 
 
+class DDPGAgent:
+    def __init__(self, state_shape, action_size, actor_lr, critic_lr, gamma, rho, buffer_size, batch_size):
+        self.state_shape = state_shape
+        self.action_size = action_size
+        self.gamma = gamma
+        self.rho = rho
+        self.memory = deque(maxlen=buffer_size)
+        self.batch_size = batch_size
+        
+        # Actor Network
+        self.actor_model = self.build_actor(state_shape, action_size, actor_lr)
+        self.target_actor_model = self.build_actor(state_shape, action_size, actor_lr)
+        self.target_actor_model.set_weights(self.actor_model.get_weights())
 
+        # Critic Network
+        self.critic_model = self.build_critic(state_shape, action_size, critic_lr)
+        self.target_critic_model = self.build_critic(state_shape, action_size, critic_lr)
+        self.target_critic_model.set_weights(self.critic_model.get_weights())
 
-class ActorCritic:
-    def __init__(self, config) -> None:
-        self.state_shape = (5,)
-        self.action_size = 2
-        self.hidden_layer_sizes = config.model.layer_sizes
-        self.learning_rate = config.model.learning_rate
-        # self.learning_rate_actor = config.model.learning_rate
-        # self.learning_rate_critic = config.model.learning_rate
-        self.memory = deque(maxlen = 300)
-        self.gamma = config.model.discount_factor
-        self.critic = self.build_critic(self.state_shape, self.hidden_layer_sizes, self.learning_rate)
-        self.actor = self.build_actor(self.state_shape, self.action_size, self.hidden_layer_sizes, self.learning_rate*1e-1)
-         
-        # Eligibility traces
-        self.eligibility_traces = True
-        self.trace_decay = 0.9
-        self.actor_eligibility_trace = [tf.zeros_like(weight) for weight in self.actor.trainable_weights]
-        self.critic_eligibility_trace = [tf.zeros_like(weight) for weight in self.critic.trainable_weights]
+        # Noise process
+        self.noise_variance = 1
+        self.noise = lambda: np.random.normal(loc=0, scale=1, size=self.action_size)
 
-    def build_critic(self, state_shape, hidden_layer_sizes, learning_rate):
-        model = Sequential()
-        model.add(Dense(hidden_layer_sizes[0], activation='relu', input_shape = state_shape))
-        for layer_size in hidden_layer_sizes[1:]:
-            model.add(Dense(layer_size, activation='relu'))
-        model.add(Dense(1, activation='linear'))
-        model.compile(loss='mse', optimizer=Adam(learning_rate=learning_rate))
+    def build_actor(self, state_shape, action_size, learning_rate):
+        # Build the actor network
+        state_input = Input(shape=state_shape)
+        h = Dense(24, activation='relu')(state_input)
+        h = Dense(24, activation='relu')(h)
+        output = Dense(action_size, activation='tanh')(h)
+        model = Model(inputs=state_input, outputs=output)
+        model.compile(optimizer=Adam(learning_rate), loss='mse')
+        return model
+
+    def build_critic(self, state_shape, action_size, learning_rate):
+        # Build the critic network
+        state_input = Input(shape=state_shape)
+        state_h = Dense(24, activation='relu')(state_input)
+
+        action_input = Input(shape=(action_size,))
+        action_h = Dense(24, activation='relu')(action_input)
+
+        concat = Concatenate()([state_h, action_h])
+        h = Dense(48, activation='relu')(concat)
+        output = Dense(1, activation='linear')(h)
+        model = Model(inputs=[state_input, action_input], outputs=output)
+        model.compile(optimizer=Adam(learning_rate), loss='mse')
         return model
     
-    def build_actor(self, state_shape, action_size, hidden_layer_sizes, learning_rate):
-        model = Sequential()
-        model.add(Dense(hidden_layer_sizes[0], activation='relu', input_shape = state_shape))
-        for layer_size in hidden_layer_sizes[1:]:
-            model.add(Dense(layer_size, activation='relu'))
-        model.add(Dense(action_size, activation='softmax'))
-        model.compile(loss=self.custom_actor_loss, optimizer=Adam(learning_rate=learning_rate))
-        return model
-    
-    def custom_actor_loss(self, y_true, y_pred):
-        y_pred_clipped = tf.clip_by_value(y_pred, 1e-7, 1-1e-7) 
-        log_probs = y_true * tf.math.log(y_pred_clipped)
-        return -tf.reduce_sum(log_probs)
-    
-    def act(self, state):
-        act_probs = self.actor.predict(state, verbose=0)[0]
-        return np.random.choice(np.arange(len(act_probs)), p=act_probs)
-    
+    def get_state_representation(self, state):
+        state = state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
+        state = np.array([state[0], state[1], np.cos(state[2]), np.sin(state[2]), state[3]]) # Convert angle to sin and cos signal
+        state = np.reshape(state, (1,5)) # Reshape to (1,5)
+        return state
+
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
-    
-    def replay(self, batch_size):
-        if len(self.memory) < batch_size:
+
+    def act(self, state, noise=True):
+        action = self.actor_model.predict(state, verbose=0)
+        if noise:
+            action = action + self.noise() # Add noise for exploration
+
+        return np.clip(action, -1, 1) # Ensure action is within bounds
+
+    def replay(self):
+        if len(self.memory) < self.batch_size:
             return
 
-        print("Running replay...")
-        mini_batch = random.sample(self.memory, batch_size)
+        # Sample a minibatch from memory
+        minibatch = random.sample(self.memory, self.batch_size)
 
-        # Prepare batches
-        states = np.zeros((batch_size, self.state_shape[0]))
-        next_states = np.zeros((batch_size, self.state_shape[0]))
-        targets = np.zeros((batch_size, 1))
-        advantages = np.zeros((batch_size, self.action_size))
+        # Separate minibatch into separate arrays for batch processing
+        states = np.array([sample[0] for sample in minibatch])
+        actions = np.array([sample[1] for sample in minibatch])
+        rewards = np.array([sample[2] for sample in minibatch])
+        next_states = np.array([sample[3] for sample in minibatch])
+        dones = np.array([sample[4] for sample in minibatch])
 
-        for i, (state, action, reward, next_state, done) in enumerate(mini_batch):
-            states[i] = state
-            next_states[i] = next_state
-            reward = reward if not done else 0
-            
-            # Compute the target for the critic
-            target = reward + self.gamma * self.critic.predict(next_state, verbose=0)
-            targets[i] = target
-            
-            # Compute the advantage for the actor
-            advantage = target - self.critic.predict(state, verbose=0)
-            advantages[i][action] = advantage
+        # Ensure correct shape of next_states
+        states = np.squeeze(states)  # Remove extra dimension if it exists
+        next_states = np.squeeze(next_states)  # Remove extra dimension if it exists
+        actions = np.squeeze(actions)  # Remove extra dimension if it exists
 
-        # Update the critic using the batch of states and targets
-        self.critic.fit(states, targets, verbose=0)
-        
-        # Update the actor using the batch of states and advantages
-        self.actor.fit(states, advantages, verbose=0)
-    
-    
+        # Compute target Q-values for the minibatch
+        target_actions = self.target_actor_model.predict(next_states, verbose=0)
+        future_qs = self.target_critic_model.predict([next_states, target_actions], verbose=0).flatten()
+        target_qs = rewards + self.gamma * future_qs * (1 - dones)  # Handle terminal states with (1 - dones)
 
-    def get_state_representation(self, state):
-        state = state[[0, 2, 4, 5]]
-        state = np.array([state[0], state[1], np.cos(state[2]), np.sin(state[2]), state[3]])
-        state = np.reshape(state, (1,5))
-        return state
-    
+        # Train critic using the entire mini-batch
+        self.critic_model.train_on_batch([states, actions], target_qs)
+
+        # Train actor using the entire mini-batch
+        with tf.GradientTape(persistent=True) as tape:
+            # Generate actions from the actor network for the entire mini-batch
+            actions_for_training = self.actor_model(states, training=True)
+
+            # Compute Q-values for the generated actions
+            critic_value = self.critic_model([states, actions_for_training], training=True)
+
+        # Compute the gradient of the Q-value with respect to the actions
+        action_grads = tape.gradient(critic_value, actions_for_training)
+
+        # Compute the gradient of the actor's weights using the chain rule
+        actor_grads = tape.gradient(actions_for_training, self.actor_model.trainable_variables) #, output_gradients=-action_grads)
+
+        # Manually multiply dQ/da with da/dw to get the final gradient to update the actor
+        # Since we're maximizing Q-value, we use the negative of dQ/da
+        final_grads = [-ag * g for ag, g in zip(action_grads, actor_grads)]
+
+        # Apply the gradients to the actor's weights
+        self.actor_model.optimizer.apply_gradients(zip(final_grads, self.actor_model.trainable_variables))
+
+        # Delete the persistent tape manually
+        del tape
+
+        # Update target networks
+        self.update_target(self.target_actor_model, self.actor_model)
+        self.update_target(self.target_critic_model, self.critic_model)
+
     def train(self, env, config):
-        dt = config.run.dt
-        num_episodes = config.run.num_episodes
-        episode_time = config.run.episode_time
-        episode_steps = int(episode_time/dt)
-
-        mini_batch_enable = False
+        dt = config.run.dt # Time step in seconds
+        num_episodes = config.run.num_episodes # Number of episodes to run
+        episode_time = config.run.episode_time # Maximum episode time in seconds
+        batch_size = config.run.batch_size # Mini-batch size for training
+        episode_steps = int(episode_time/dt) # Number of time steps in an episode
 
         for e in range(num_episodes):
-            state = env.reset(deterministic=False)
+            state = env.reset(deterministic=True)
             state = self.get_state_representation(state)
-            I = 1 # Importance sampling ratio
-
             for time_step in range(episode_steps):
-                # action = self.act(state)
-                policy = self.actor.predict(state, verbose=0)
-                action = np.random.choice(np.arange(len(policy[0])), p=policy[0])
-
-                next_state, reward, done = env.step(action, dt)
-                # print(f"angle: {next_state[4]*180/np.pi}, state: {next_state}, done: {done}")
+                action = self.act(state)
+                next_state, reward, done = env.step_continuous(action, dt)
                 next_state = self.get_state_representation(next_state)
                 reward = reward if not done else config.model.termination_penalty
-
-                if mini_batch_enable:
-                    self.remember(state, action, reward, next_state, done)
-                    self.replay(config.run.batch_size)   
-                elif self.eligibility_traces:
-
-                    # Compute the target for the critic
-                    target = tf.convert_to_tensor(reward + self.gamma * self.critic(next_state, training=False), dtype=tf.float32)
-
-                    # Compute the advantage for the actor
-                    current_state_value = tf.convert_to_tensor(self.critic(state, training=False), dtype=tf.float32)
-                    advantage = target - current_state_value  # Advantage
-
-                    y_true = np.zeros((1, self.action_size))
-                    y_true[0][action] = I * advantage 
-                    y_true = tf.convert_to_tensor(y_true, dtype=tf.float32)
-
-                    # Compute gradient of the critic
-                    with tf.GradientTape() as tape:
-                        # Forward pass using the call method
-                        current_state_value = self.critic(state, training=True)
-                        critic_loss = MeanSquaredError()(target, current_state_value) # Compute the loss for the critic
-                    critic_grads = tape.gradient(critic_loss, self.critic.trainable_weights) # Compute the gradient of the loss w.r.t. the critic weights
-                    print(f"critic_loss: {critic_loss}, grads: {critic_grads}")
-                    # self.critic_eligibility_trace = self.gamma * self.trace_decay * self.critic_eligibility_trace + critic_grads # Update the eligibility trace for the critic
-                    # Update the critic eligibility trace, but only if the gradients are not None
-                    self.critic_eligibility_trace = [
-                        self.gamma * self.trace_decay * trace + advantage*grad if grad is not None else trace
-                        for trace, grad in zip(self.critic_eligibility_trace, critic_grads)
-                    ]
-                    self.critic.optimizer.apply_gradients(zip(self.critic_eligibility_trace, self.critic.trainable_weights)) # Update the critic weights
-                    # Update the actor using the advantage
-                    # Compute gradient of the actor
-                    with tf.GradientTape() as tape:
-                        actor_loss = self.custom_actor_loss(y_true, policy)
-                    actor_grads = tape.gradient(actor_loss, self.actor.trainable_weights)
-                    print(f"actor_loss: {actor_loss}, grads: {actor_grads}")
-                    # self.actor_eligibility_trace = self.gamma * self.trace_decay * self.actor_eligibility_trace + actor_grads
-                    # Update the actor eligibility trace, but only if the gradients are not None
-                    self.actor_eligibility_trace = [
-                        self.gamma * self.trace_decay * trace + advantage*grad if grad is not None else trace
-                        for trace, grad in zip(self.actor_eligibility_trace, actor_grads)
-                    ]
-                    self.actor.optimizer.apply_gradients(zip(self.actor_eligibility_trace, self.actor.trainable_weights))
-
-
-                else:
-                    # Compute the target for the critic
-                    target = reward + self.gamma * self.critic.predict(next_state, verbose=0) # TD-target
-                    # Compute the advantage for the actor
-                    advantage = target - self.critic.predict(state, verbose=0) # Advantage
-
-                    # print(f"G: {G}, done: {done}")
-                    # Update the critic using the target value
-                    self.critic.fit(state, target, verbose=0)
-
-                    # Update the actor using the advantage
-                    y_true = np.zeros((1, self.action_size))
-                    y_true[0][action] = I * advantage
-                    self.actor.fit(state, y_true, verbose=0)
-
+                self.remember(state, action, reward, next_state, done)
                 if done:
                     print(f"episode: {e}/{num_episodes}, score: {time_step}")
                     break
-
-                # I *= self.gamma
+                self.replay()
                 state = next_state
-
             if config.model.save_weights.enable:
                 if e%config.model.save_weights.save_frequency == 0 and e != 0:
                     self.save(os.path.join('weights', config.model.save_weights.file_name))
+
+    def update_target(self, target_model, model):
+        # Get the weights of both models
+        target_weights = target_model.get_weights()
+        weights = model.get_weights()
+        
+        # Update target network weights
+        new_weights = []
+        for target_weight, weight in zip(target_weights, weights):
+            # Perform the soft update
+            updated_weight = self.rho * target_weight + (1 - self.rho) * weight
+            new_weights.append(updated_weight)
+        
+        # Set the new weights to the target model
+        target_model.set_weights(new_weights)
+
+    def load_weights(self, filepath):
+        base, extension = os.path.splitext(filepath)
+        self.actor_model.load_weights(base + '_actor' + extension)
+        self.critic_model.load_weights(base + '_critic' + extension)
     
     def save(self, filepath):
-        actor_filepath = filepath + '_actor'
-        critic_filepath = filepath + '_critic'
-        self.actor.save_weights(actor_filepath)
-        self.critic.save_weights(critic_filepath)
-    
-    def load_weights(self, filepath):
-        actor_filepath = filepath + '_actor'
-        critic_filepath = filepath + '_critic'
-        self.actor.load_weights(actor_filepath)
-        self.critic.load_weights(critic_filepath)
-
-    
-
-# class ActorCritic:
-#     def __init__(self, config) -> None:
-#         self.state_shape = (5,)
-#         self.action_size = 2
-#         self.hidden_layer_sizes = config.model.layer_sizes
-#         self.learning_rate = config.model.learning_rate
-#         self.gamma = config.model.discount_factor
-#         self.model = self.build_shared_network(self.state_shape, self.action_size, self.hidden_layer_sizes, self.learning_rate)
-
-#     def build_shared_network(self, state_shape, action_size, hidden_layer_sizes, learning_rate):
-#         # Shared input and hidden layers
-#         input_layer = Input(shape=state_shape)
-#         hidden = Dense(hidden_layer_sizes[0], activation='relu')(input_layer)
-#         for layer_size in hidden_layer_sizes[1:]:
-#             hidden = Dense(layer_size, activation='relu')(hidden)
-
-#         # Separate policy head
-#         policy_hidden = Dense(8, activation='relu')(hidden)
-#         policy_hidden = Dense(8, activation='relu')(policy_hidden)
-#         policy_output = Dense(action_size, activation='softmax', name='policy_output')(policy_hidden)
-
-#         # Separate value head
-#         value_hidden = Dense(8, activation='relu')(hidden)
-#         value_hidden = Dense(8, activation='relu')(value_hidden)
-#         value_output = Dense(1, activation='linear', name='value_output')(value_hidden)
-
-#         # Define the model with two outputs
-#         model = Model(inputs=input_layer, outputs=[policy_output, value_output])
-#         model.compile(
-#             optimizer=Adam(learning_rate=learning_rate),
-#             loss={'policy_output': self.custom_actor_loss, 'value_output': 'mse'}
-#         )
-#         return model
-    
-#     def custom_actor_loss(self, y_true, y_pred):
-#         y_pred_clipped = tf.clip_by_value(y_pred, 1e-7, 1-1e-7)
-#         log_probs = y_true * tf.math.log(y_pred_clipped)
-#         return -tf.reduce_sum(log_probs)
-
-#     def act(self, state):
-#         policy, _ = self.model.predict(state, verbose=0)
-#         return np.random.choice(np.arange(len(policy[0])), p=policy[0])
-    
-#     def get_state_representation(self, state):
-#         state = state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
-#         state = np.array([state[0], state[1], np.cos(state[2]), np.sin(state[2]), state[3]])
-#         state = np.reshape(state, (1, 5))
-#         return state
-    
-#     def train(self, env, config):
-#         dt = config.run.dt
-#         num_episodes = config.run.num_episodes
-#         episode_time = config.run.episode_time
-#         episode_steps = int(episode_time/dt)
-
-#         for e in range(num_episodes):
-#             state = env.reset()
-#             state = self.get_state_representation(state)
-#             I = 1 # Importance sampling ratio
-#             cumul_reward = 0
-#             for time_step in range(episode_steps):
-#                 policy, value_current = self.model.predict(state, verbose=0) # Predict the current value and policy
-#                 print(f"policy: {policy}, value_current: {value_current}")
-#                 action = np.random.choice(np.arange(len(policy[0])), p=policy[0]) # Sample action from policy
-
-#                 next_state, reward, done = env.step(action, dt)
-#                 next_state = self.get_state_representation(next_state)
-#                 reward = reward if not done else config.model.termination_penalty
-#                 cumul_reward *= self.gamma
-#                 cumul_reward += reward
-
-#                 # Predict the value of the next state
-#                 _, value_next = self.model.predict(next_state, verbose=0)
-
-#                 # Compute the target for the value head
-#                 target = reward + self.gamma * value_next
-
-#                 # Compute the advantage
-#                 advantage = target - value_current 
-
-#                 # Prepare y_true for the actor update
-#                 y_true_policy = np.zeros((1, self.action_size))
-#                 y_true_policy[0][action] = I * advantage
-
-#                 # Make a single call to fit to update both heads simultaneously
-#                 self.model.fit(state, {'policy_output': y_true_policy, 'value_output': target}, verbose=0)
-
-
-#                 if done:
-#                     print(f"episode: {e}/{num_episodes}, score: {time_step}")
-#                     # Print total cumulative reward
-#                     print(f"Total cumulative reward: {cumul_reward}")
-#                     break
-
-#                 I *= self.gamma
-#                 state = next_state
-
-#             if config.model.save_weights.enable:
-#                 if e % config.model.save_weights.save_frequency == 0 and e != 0:
-#                     self.save(os.path.join('weights', config.model.save_weights.file_name))
-
-    
-
-#     def save(self, filepath):
-#         self.model.save_weights(filepath)
-
-#     def load_weights(self, filepath):
-#         self.model.load_weights(filepath)
-
-
+        base, extension = os.path.splitext(filepath)
+        self.actor_model.save(base + '_actor' + extension)
+        self.critic_model.save(base + '_critic' + extension)

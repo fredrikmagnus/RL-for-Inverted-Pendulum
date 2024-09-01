@@ -81,12 +81,12 @@ class Pendulum:
         # r_pos =  a1*x+b if x<= 0 else a2*x+b
 
         # return r_theta+r_pos
-        # return 1
+        return 1
 
-        x = self.state[0]
-        x_lim = self.x_lim
-        reward = 1 - abs(x) / x_lim
-        return max(reward, 0)
+        # x = self.state[0]
+        # x_lim = self.x_lim
+        # reward = 1 - abs(x) / x_lim
+        # return max(reward, 0)
 
         # # Reward for swinging up
         # angle = self.state[4]
@@ -114,7 +114,24 @@ class Pendulum:
         #     self.terminated = True
         return self.state, self.reward(), self.terminated # New-state, reward, done
     
-    def animate(self, agent):
+    def step_continuous(self, action, dt):
+        """ Returns: state, reward, done """
+        # We assume for now that the action is a continuous value between -1 and 1
+        angle = self.state[4]
+        min_force = -30
+        max_force = 30
+        # Interpolate force between -30 and 30 given the action
+        force = min_force + (action[0][0]+1)/2 * (max_force-min_force)
+        self.update(np.array([force, 0]), 9.8, dt)
+
+        # Check termination:
+        abs_pos = np.abs(self.state[0])
+        abs_angle = np.abs(self.state[4]-np.pi/2)
+        if abs_pos > self.x_lim or abs_angle > self.angle_lim: # Terminate if outside limits
+            self.terminated = True
+        return self.state, self.reward(), self.terminated # New-state, reward, done
+    
+    def animate(self, agent, continuous=False):
         import pygame as pg
 
         pg.init() #initialize pygame
@@ -144,20 +161,30 @@ class Pendulum:
                     running = False
             
             state = agent.get_state_representation(self.state)
-            action = agent.act(state)
-            if action == 0: action = -1 # Convert action 0 (left) to -1
-            angle = self.state[4]
-            min_force = 20
-            max_force = 25
-            force = lambda theta: min_force+np.abs(theta-np.pi/2)/self.angle_lim * (max_force-min_force) # Force is higher given higher angle error
-            
+            action = agent.act(state) if not continuous else agent.act(state, noise=False)
+
             pos = np.array([self.state[0], self.state[1]])
             angle = self.state[4]
+
+            if not continuous:
+                if action == 0: action = -1 # Convert action 0 (left) to -1
+                angle = self.state[4]
+                min_force = 20
+                max_force = 25
+                force = min_force+np.abs(angle-np.pi/2)/self.angle_lim * (max_force-min_force) # Force is higher given higher angle error
+                force = action*force
+            else:
+                angle = self.state[4]
+                min_force = -35
+                max_force = 35
+                force = min_force + (action[0][0]+1)/2 * (max_force-min_force)
+
+            
             p_base = np.array([0, height])+60*np.array([1, -1])*(pos + np.array([width/120, height/120])) # base of pendulum (flip y-axis)
             p_end = np.array([0, height])+60*np.array([1, -1])*((pos + np.array([width/120, height/120])) + self.length*np.array([np.cos(angle), np.sin(angle)])) # end of pendulum (flip y-axis)
             pg.draw.line(screen, (0,0,0), p_base, p_end , 2)
 
-            self.update(np.array([action*force(angle), 0]), 9.8, dt)
+            self.update(np.array([force, 0]), 9.8, dt)
 
             pg.display.flip() # update screen?
             fpsClock.tick(1/dt)

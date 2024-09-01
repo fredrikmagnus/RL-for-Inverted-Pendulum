@@ -1,6 +1,6 @@
 
 from pendulum import Pendulum
-from models import REINFORCEAgent, DQNAgent, ActorCritic
+from models import REINFORCEAgent, DQNAgent, DDPGAgent
 import numpy as np
 import matplotlib.pyplot as plt
 from keras.utils import custom_object_scope
@@ -36,7 +36,7 @@ mass_bob = config.pendulum_env.mass_bob # Mass of the bob (kg)
 
 # Initialise the pendulum environment
 env = Pendulum(length, mass_base, mass_bob)
-
+continous = False
 #  Initialise the agent
 if model_type == 'REINFORCE':
     agent = REINFORCEAgent((5,), 2, hidden_layer_sizes, discount_factor, learning_rate)
@@ -52,20 +52,28 @@ elif model_type == 'DQN':
         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
         agent.load_weights(weights_path)
 
-elif model_type == 'ActorCritic':
-    agent = ActorCritic(config)
+elif model_type == 'DDPG':
+    agent = DDPGAgent((5,), 1, learning_rate, learning_rate, discount_factor, 0.95, 256, 16)
+    continous = True
     # Load initial weights if specified
     if config.model.init_from_weights.enable:
         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
         agent.load_weights(weights_path)
+
+# elif model_type == 'ActorCritic':
+#     agent = ActorCritic(config)
+#     # Load initial weights if specified
+#     if config.model.init_from_weights.enable:
+#         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
+#         agent.load_weights(weights_path)
 
 
 if run_type == 'train': # Run the training loop
     agent.train(env, config)
 
 elif run_type == 'test': # Run test
-    env.reset()
-    env.animate(agent)
+    env.reset(deterministic=True)
+    env.animate(agent, continuous=continous)
 
 
 
