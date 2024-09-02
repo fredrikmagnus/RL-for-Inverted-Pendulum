@@ -1,0 +1,52 @@
+run:
+  type: test # train or test
+  num_episodes: 1000 # Number of episodes to run
+  episode_time: 25 # Maximum episode time in seconds
+  # dt: 0.025 # Time step in seconds
+  batch_size: 16 # Mini-batch size for training
+
+pendulum:
+  deterministic_initial_state: False # Use a deterministic initial state or add noise
+  initial_state: up # Initial state of the pendulum (up, down)
+
+  time_step: 0.025 # Time step for the simulation
+
+  mass_bob: 1.0 # Mass of the bob
+  mass_base: 1.0 # Mass of the base
+  length: 1.0 # Length of the pendulum
+
+  termination:
+    angle_limit: 30 # Angle limit for the pendulum (in degrees). Set to None for no limit.
+    x_limit: 7 # X limit for the pendulum (in meters). Set to None for no limit.
+    time_limit: 25 # Time limit for the episode (in seconds). Set to None for no limit.
+    termination_penalty: -20 # Penalty for terminating the episode early.
+
+model:
+  type: DDPG # DQN, REINFORCE or DDPG
+  discount_factor: 0.95 # Discount factor for future rewards
+  learning_rate: 1e-3 # Learning rate for the optimizer
+  layer_sizes: [16, 16] # Number of neurons in each layer
+
+  termination_penalty: -20 # Penalty for terminating the episode early
+
+  init_from_weights: 
+    enable: True # Initialize model from weights
+    file_name: "DDPG3.keras" # File name to load weights from
+  save_weights:
+    enable: true # Save weights to file
+    file_name: "DDPG3.keras" # File name to save weights to
+    save_frequency: 10 # Save weights every n episodes
+
+  DQN_params:
+    epsilon_init: 1 # Initial epsilon value (for epsilon-greedy policy)
+    epsilon_min: 0.1 # Minimum epsilon value
+    epsilon_decay: 0.9 # Epsilon decay rate
+
+# pendulum_env:
+#   length: 1.0 # Length of the pendulum
+#   mass_base: 1.0 # Mass of the base
+#   mass_bob: 1.0 # Mass of the bob
+
+
+
+  
