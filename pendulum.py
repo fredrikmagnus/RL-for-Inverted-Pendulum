@@ -34,9 +34,13 @@ class Pendulum:
         
         self.state[4] = self.state[4] % (2*np.pi) # Keep angle between 0 and 2pi
 
-    def reset(self, deterministic=False):
+    def reset(self, deterministic=False, down=False):
         if deterministic:
             self.state = np.array([0, 0, 0, 0, np.pi/2, 0])
+            self.terminated = False
+        elif down:
+            noise = np.random.normal(0, 0.1, 6)
+            self.state = np.array([0, 0, 0, 0, -np.pi/2, 0]) + noise
             self.terminated = False
         else:
             # Sets a random initial state which is returned
@@ -52,6 +56,8 @@ class Pendulum:
 
             self.state = np.array([x_pos, 0, x_vel, 0, angle, angle_vel]) #(x_pos, y_pos, x_vel, y_vel, angle, ang_vel)
             self.terminated = False
+        
+
         
         return self.state
     
@@ -81,7 +87,7 @@ class Pendulum:
         # r_pos =  a1*x+b if x<= 0 else a2*x+b
 
         # return r_theta+r_pos
-        return 1
+        # return 1
 
         # x = self.state[0]
         # x_lim = self.x_lim
@@ -94,6 +100,11 @@ class Pendulum:
         # x_pos = self.state[0]
         # R2 = -0.5*np.abs(x_pos/self.x_lim) # Reward for being close to center
         # return R1 + R2 +1 # Total reward
+        
+        sin_angle = np.sin(self.state[4])
+        
+        return 1 + sin_angle
+        # return 1 if np.abs(angle) < np.pi/6 else 0
     
     def step(self, action, dt):
         """ Returns: state, reward, done """
@@ -127,9 +138,16 @@ class Pendulum:
         # Check termination:
         abs_pos = np.abs(self.state[0])
         abs_angle = np.abs(self.state[4]-np.pi/2)
-        if abs_pos > self.x_lim or abs_angle > self.angle_lim: # Terminate if outside limits
+        # if abs_pos > self.x_lim or abs_angle > self.angle_lim: # Terminate if outside limits
+        #     self.terminated = True
+        if abs_pos > self.x_lim: # Terminates if outside x limits
             self.terminated = True
         return self.state, self.reward(), self.terminated # New-state, reward, done
+    
+    def step(self, force, dt):
+
+        self.update(np.array([force, 0]), 9.8, dt)
+        
     
     def animate(self, agent, continuous=False):
         import pygame as pg

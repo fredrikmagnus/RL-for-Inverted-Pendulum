@@ -53,7 +53,7 @@ elif model_type == 'DQN':
         agent.load_weights(weights_path)
 
 elif model_type == 'DDPG':
-    agent = DDPGAgent((5,), 1, learning_rate, learning_rate, discount_factor, 0.95, 256, 16)
+    agent = DDPGAgent((5,), 1, learning_rate*0.01, learning_rate, discount_factor, 0.95, 512, 16)
     continous = True
     # Load initial weights if specified
     if config.model.init_from_weights.enable:
@@ -72,7 +72,7 @@ if run_type == 'train': # Run the training loop
     agent.train(env, config)
 
 elif run_type == 'test': # Run test
-    env.reset(deterministic=True)
+    env.reset(deterministic=False, down=True)
     env.animate(agent, continuous=continous)
 
 

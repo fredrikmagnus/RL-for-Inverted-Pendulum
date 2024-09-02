@@ -8,17 +8,17 @@ run:
 model:
   type: DDPG # DQN, REINFORCE or DDPG
   discount_factor: 0.95 # Discount factor for future rewards
-  learning_rate: 1e-4 # Learning rate for the optimizer
+  learning_rate: 1e-3 # Learning rate for the optimizer
   layer_sizes: [16, 16] # Number of neurons in each layer
 
-  termination_penalty: -3 # Penalty for terminating the episode early
+  termination_penalty: -20 # Penalty for terminating the episode early
 
   init_from_weights: 
     enable: True # Initialize model from weights
-    file_name: "DDPG.keras" # File name to load weights from
+    file_name: "DDPG3.keras" # File name to load weights from
   save_weights:
     enable: true # Save weights to file
-    file_name: "DDPG.keras" # File name to save weights to
+    file_name: "DDPG3.keras" # File name to save weights to
     save_frequency: 10 # Save weights every n episodes
 
   DQN_params:

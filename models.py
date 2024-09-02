@@ -217,28 +217,31 @@ class DDPGAgent:
 
         # Noise process
         self.noise_variance = 1
-        self.noise = lambda: np.random.normal(loc=0, scale=1, size=self.action_size)
+        self.noise = lambda: np.random.normal(loc=0, scale=self.noise_variance, size=self.action_size)
 
     def build_actor(self, state_shape, action_size, learning_rate):
         # Build the actor network
         state_input = Input(shape=state_shape)
-        h = Dense(24, activation='relu')(state_input)
-        h = Dense(24, activation='relu')(h)
+        h = Dense(8, activation='relu')(state_input)
+        h = Dense(8, activation='relu')(h)
+        h = Dense(8, activation='relu')(h)
         output = Dense(action_size, activation='tanh')(h)
         model = Model(inputs=state_input, outputs=output)
-        model.compile(optimizer=Adam(learning_rate), loss='mse')
+        model.compile(optimizer=Adam(learning_rate))
         return model
 
     def build_critic(self, state_shape, action_size, learning_rate):
         # Build the critic network
         state_input = Input(shape=state_shape)
-        state_h = Dense(24, activation='relu')(state_input)
+        state_h = Dense(8, activation='relu')(state_input)
 
         action_input = Input(shape=(action_size,))
-        action_h = Dense(24, activation='relu')(action_input)
+        action_h = Dense(8, activation='relu')(action_input)
 
         concat = Concatenate()([state_h, action_h])
-        h = Dense(48, activation='relu')(concat)
+        h = Dense(16, activation='relu')(concat)
+        h = Dense(8, activation='relu')(h)
+        h = Dense(8, activation='relu')(h)
         output = Dense(1, activation='linear')(h)
         model = Model(inputs=[state_input, action_input], outputs=output)
         model.compile(optimizer=Adam(learning_rate), loss='mse')
@@ -255,6 +258,7 @@ class DDPGAgent:
 
     def act(self, state, noise=True):
         action = self.actor_model.predict(state, verbose=0)
+
         if noise:
             action = action + self.noise() # Add noise for exploration
 
@@ -299,14 +303,22 @@ class DDPGAgent:
         action_grads = tape.gradient(critic_value, actions_for_training)
 
         # Compute the gradient of the actor's weights using the chain rule
-        actor_grads = tape.gradient(actions_for_training, self.actor_model.trainable_variables) #, output_gradients=-action_grads)
+        actor_grads = tape.gradient(actions_for_training, self.actor_model.trainable_variables, output_gradients=-action_grads)
 
-        # Manually multiply dQ/da with da/dw to get the final gradient to update the actor
-        # Since we're maximizing Q-value, we use the negative of dQ/da
-        final_grads = [-ag * g for ag, g in zip(action_grads, actor_grads)]
+        # print(f"actor_grads: {actor_grads}")
+
 
         # Apply the gradients to the actor's weights
-        self.actor_model.optimizer.apply_gradients(zip(final_grads, self.actor_model.trainable_variables))
+        # weights_prev = self.actor_model.get_weights()
+
+        self.actor_model.optimizer.apply_gradients(zip(actor_grads, self.actor_model.trainable_variables))
+
+        # actions_for_training_new = self.actor_model(states, training=True)
+
+        # weights_new = self.actor_model.get_weights()
+
+
+
 
         # Delete the persistent tape manually
         del tape
@@ -321,24 +333,30 @@ class DDPGAgent:
         episode_time = config.run.episode_time # Maximum episode time in seconds
         batch_size = config.run.batch_size # Mini-batch size for training
         episode_steps = int(episode_time/dt) # Number of time steps in an episode
+        
 
         for e in range(num_episodes):
-            state = env.reset(deterministic=True)
+            state = env.reset(deterministic=False, down = True)
             state = self.get_state_representation(state)
+            R = 0
             for time_step in range(episode_steps):
                 action = self.act(state)
                 next_state, reward, done = env.step_continuous(action, dt)
                 next_state = self.get_state_representation(next_state)
                 reward = reward if not done else config.model.termination_penalty
+                R += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {time_step}")
+                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}")
                     break
                 self.replay()
                 state = next_state
             if config.model.save_weights.enable:
                 if e%config.model.save_weights.save_frequency == 0 and e != 0:
                     self.save(os.path.join('weights', config.model.save_weights.file_name))
+            
+        self.noise_variance *= 0.97
+        self.noise = lambda: np.random.normal(loc=0, scale=self.noise_variance, size=self.action_size)
 
     def update_target(self, target_model, model):
         # Get the weights of both models

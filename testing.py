@@ -1,5 +1,5 @@
 from pendulum import Pendulum
-from models import REINFORCEAgent, DQNAgent, ActorCritic
+from models import REINFORCEAgent, DQNAgent, DDPGAgent
 import numpy as np
 import matplotlib.pyplot as plt
 from keras.utils import custom_object_scope
@@ -50,8 +50,9 @@ elif model_type == 'DQN':
         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
         agent.load_weights(weights_path)
 
-elif model_type == 'ActorCritic':
-    agent = ActorCritic(config)
+elif model_type == 'DDPG':
+    agent = DDPGAgent((5,), 1, learning_rate, learning_rate, discount_factor, 0.95, 256, 16)
+    continous = True
     # Load initial weights if specified
     if config.model.init_from_weights.enable:
         weights_path = os.path.join('weights', config.model.init_from_weights.file_name)
@@ -123,9 +124,10 @@ def plot_value_function(agent):
     for i, a in enumerate(angle):
         state = np.array([0, 0, np.cos(a), np.sin(a), 0])
         state = np.reshape(state, (1, 5))
-        if model_type == 'ActorCritic':
+        action = np.array([0])
+        if model_type == 'DDPG':
             # _, value[i] = agent.model.predict(state, verbose=0)
-            value[i] = agent.critic.predict(state, verbose=0)
+            value[i] = agent.critic_model.predict([state, action], verbose=0)
         elif model_type == 'DQN':
             value[i] = np.max(agent.model.predict(state, verbose=0))
             print(value[i])
