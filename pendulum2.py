@@ -50,10 +50,6 @@ class Pendulum:
     def reset(self):
         """
         Resets the environment to the initial state.
-
-        Args:
-            deterministic (bool): Use a deterministic initial state or add noise.
-            down (bool): Initial state of the pendulum (up or down).
         """
         deterministic = self.config.deterministic_initial_state
         down = self.config.initial_state=='down'

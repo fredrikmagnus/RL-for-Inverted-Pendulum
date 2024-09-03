@@ -12,23 +12,24 @@ from pendulum2 import Pendulum
 
 class DQNAgent:
     def __init__(self, config : ModelParams) -> None:
-        # self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
-        # self.action_size = 2 # Number of actions (force left or right)
+        self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
+        self.action_size = 2 # Number of actions (force left or right)
         # self.hidden_layer_sizes = config.DQN.hidden_layer_sizes # List specifying the number of neurons in each layer
         # self.learning_rate = config.DQN.learning_rate # Learning rate for the optimizer
-        self.memory = deque(maxlen = config.memory_size) # Circular buffer with maxlen 1000 (approximately). Used to store transitions to learn from.
+        self.memory = deque(maxlen = config.memory_size) # Circular buffer used to store transitions to learn from.
         self.gamma = config.discount_factor # Discount rate
         self.eps_init = config.DQN.epsilon.epsilon_init # Epsilon for epsilon-greedy policy
         self.epsilon_min = config.DQN.epsilon.epsilon_min # Minimum epsilon value
         self.epsilon_decay = config.DQN.epsilon.epsilon_decay # Epsilon decay rate
+        self.force_magnitude = config.force_magnitude # Magnitude of the force applied to the base
         self.model = self.build_model(config.DQN)
 
     def build_model(self, config : DQNParams):
         model = Sequential()
-        model.add(Dense(config.hidden_layer_sizes[0], activation='relu', input_shape = (5,))) # Input layer with 5 neurons (state representation)
+        model.add(Dense(config.hidden_layer_sizes[0], activation='relu', input_shape = self.state_shape)) # Input layer with 5 neurons (state representation)
         for layer_size in config.hidden_layer_sizes[1:]:
             model.add(Dense(layer_size, activation='relu')) # Hidden layers with specified number of neurons
-        model.add(Dense(2, activation='linear')) # Output layer with 2 neurons (one for each action)
+        model.add(Dense(self.action_size, activation='linear')) # Output layer with 2 neurons (one for each action)
         model.compile(loss='mse', optimizer=Adam(learning_rate=config.learning_rate)) # Compile model with mse loss and Adam optimizer
         return model
     
@@ -42,33 +43,22 @@ class DQNAgent:
         # return np.argmax(act_values[0])
 
         if np.random.rand() <= self.eps_init:
-            action = random.randrange(2) # Random action (0:left or 1:right)
+            action = random.randrange(self.action_size) # Random action (0:left or 1:right)
         else:
             action_values = self.model.predict(state, verbose=0)
             action = np.argmax(action_values[0]) # Greedy action (0:left or 1:right)
         
-        force = -25 if action == 0 else 25 # Convert action to force value 
+        force = -self.force_magnitude if action == 0 else self.force_magnitude # Convert action to force value 
         return np.array([force, 0]), action # Return force vector and action taken
         
     
     def replay(self, batch_size):
-        # minibatch = random.sample(self.memory, batch_size)
-        # print("Running replay...")
-        # for state, action, reward, next_state, done in minibatch:
-        #     target = reward
-        #     if not done:
-        #         target = reward + self.gamma*np.max(self.model.predict(next_state, verbose=0)[0]) # Bellman equation to compute better estimate of expected future return
-        #     target_f = self.model.predict(state, verbose=0) # Model prediction of future return
-        #     target_f[0][action] = target # Update the estimate of future return for the action taken based on updated better estimate
-        #     self.model.fit(state, target_f, epochs=1, verbose=0) # Update weights using mse
-        # if self.eps_init > self.epsilon_min:
-        #     self.eps_init *= self.epsilon_decay
         minibatch = random.sample(self.memory, batch_size)
         print("Running replay...")
 
         # Initialize arrays for states, targets_f
-        states = np.zeros((batch_size, 5))
-        targets_f = np.zeros((batch_size, 2))
+        states = np.zeros((batch_size, self.state_shape[0]))
+        targets_f = np.zeros((batch_size, self.action_size))
 
         for i, (state, action, reward, next_state, done) in enumerate(minibatch):
             target = reward
@@ -130,14 +120,15 @@ class DQNAgent:
 
 
 class REINFORCEAgent:
-    def __init__(self, state_shape, action_size, hidden_layer_sizes, discount_factor, learning_rate) -> None:
-        self.state_shape = state_shape
-        self.action_size = action_size
-        self.hidden_layer_sizes = hidden_layer_sizes # List specifying the number of neurons in each layer
-        self.learning_rate = learning_rate
-        self.memory = deque(maxlen = 1000) # Used to store transitions to learn from.
-        self.gamma = discount_factor # Discount rate
-        self.model = self.build_model(state_shape, action_size, hidden_layer_sizes, learning_rate)
+    def __init__(self, config : ModelParams) -> None:
+        self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
+        self.action_size = 2 # Number of actions (force left or right)
+        self.hidden_layer_sizes = config.REINFORCE.hidden_layer_sizes # List specifying the number of neurons in each layer
+        self.learning_rate = config.REINFORCE.learning_rate # Learning rate for the optimizer
+        self.memory = deque(maxlen = config.memory_size) # Used to store transitions to learn from.
+        self.force_magnitude = config.force_magnitude # Magnitude of the force applied to the base
+        self.gamma = config.discount_factor # Discount rate
+        self.model = self.build_model()
 
     def custom_loss(self, y_true, y_pred):
         # We now redefine the loss-function to avoid having to store the rewards in a class.
@@ -149,21 +140,23 @@ class REINFORCEAgent:
 
         return -tf.reduce_sum(log_probs)
 
-    def build_model(self, state_shape, action_size, hidden_layer_sizes, learning_rate):
+    def build_model(self):
         model = Sequential()
-        model.add(Dense(hidden_layer_sizes[0], activation='relu', input_shape = state_shape))
-        for layer_size in hidden_layer_sizes[1:]:
+        model.add(Dense(self.hidden_layer_sizes[0], activation='relu', input_shape = self.state_shape))
+        for layer_size in self.hidden_layer_sizes[1:]:
             model.add(Dense(layer_size, activation='relu'))
-        model.add(Dense(action_size, activation='softmax'))
-        model.compile(loss=self.custom_loss, optimizer=Adam(learning_rate=learning_rate))
+        model.add(Dense(self.action_size, activation='softmax'))
+        model.compile(loss=self.custom_loss, optimizer=Adam(learning_rate=self.learning_rate))
         return model
     
     def remember(self, state, action, reward, G, time_step):
         self.memory.append((state, action, reward, G, time_step))
 
     def act(self, state):
-        act_probs = self.model.predict(state, verbose=0)[0]
-        return np.random.choice(np.arange(len(act_probs)), p=act_probs)
+        act_probs = self.model.predict(state, verbose=0)[0] # Get action probabilities
+        action = np.random.choice(np.arange(len(act_probs)), p=act_probs) # Sample action from action probabilities
+        force = -self.force_magnitude if action == 0 else self.force_magnitude # Convert action to force value
+        return np.array([force, 0]), action # Return force vector and action taken
     
     def replay(self, batch_size):
         minibatch = random.sample(self.memory, batch_size) # Sample a mini-batch from memory
@@ -181,8 +174,8 @@ class REINFORCEAgent:
         state = np.reshape(state, (1,5)) # Reshape to (1,5)
         return state
     
-    def train(self, env, config):
-        dt = config.run.dt # Time step in seconds
+    def train(self, env : Pendulum, config : Config):
+        dt = env.time_step # Time step in seconds
         num_episodes = config.run.num_episodes # Number of episodes to run
         episode_time = config.run.episode_time # Maximum episode time in seconds
         batch_size = config.run.batch_size # Mini-batch size for training
@@ -194,10 +187,9 @@ class REINFORCEAgent:
             
             ep = [] # List of tuples (state, action, reward)
             for time_step in range(episode_steps): # Play episode
-                action = self.act(state) # Get action from agent
-                next_state, reward, done = env.step(action, dt) # Take action in environment
+                force, action = self.act(state) # Get action from agent
+                next_state, reward, done = env.step(force) # Take action in environment
                 next_state = self.get_state_representation(next_state) # Get state representation
-                reward = reward if not done else config.model.termination_penalty # Penalize termination
                 ep.append((state, action, reward)) # Add state, action, reward to episode history
                 if done:
                     print(f"episode: {e}/{num_episodes}, score: {time_step}")
@@ -219,9 +211,9 @@ class REINFORCEAgent:
                 for i in range(len(self.memory)//batch_size):
                     self.replay(batch_size)
 
-            if config.model.save_weights.enable: # Save weights
-                if e%config.model.save_weights.save_frequency == 0 and e != 0:
-                    self.save(os.path.join('weights', config.model.save_weights.file_name))
+            if config.model.IO_parameters.save_weights.enable:
+                if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
+                    self.save(os.path.join('weights', config.model.IO_parameters.save_weights.file_name))
             
 
     def load_weights(self, filepath):

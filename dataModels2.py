@@ -73,6 +73,8 @@ class ModelParams(BaseModel):
     type: Literal['DQN', 'REINFORCE', 'DDPG'] = Field("DDPG", description="Type of model to use.")
     memory_size: int = Field(1000, description="Size of the replay memory buffer.")
     discount_factor: float = Field(0.95, description="Discount factor for future rewards.")
+    force_magnitude: float = Field(20, description="Magnitude of the force applied to the base.")
+
     IO_parameters: IOParameters = IOParameters()
     DQN: DQNParams = DQNParams()
     REINFORCE: REINFORCEParams = REINFORCEParams()
