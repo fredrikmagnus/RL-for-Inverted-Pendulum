@@ -1,65 +1,105 @@
 from pydantic import BaseModel, Field, validator
-from typing import List, Dict, Union, Optional, Literal
+from typing import List, Optional, Union, Literal
 import ruamel.yaml
+
+class TerminationParams(BaseModel):
+    angle_limit: Optional[float] = Field(None, description="Angle limit for the pendulum in degrees. Set to None for no limit.")
+    x_limit: Optional[float] = Field(None, description="X limit for the pendulum in meters. Set to None for no limit.")
+    time_limit: Optional[float] = Field(None, description="Time limit for the episode in seconds. Set to None for no limit.")
+    termination_penalty: float = Field(-20, description="Penalty for terminating the episode early.")
+
+
+class LoggingParams(BaseModel):
+    enable: bool = Field(True, description="Enable logging.")
+    overwrite: bool = Field(False, description="Overwrite existing log file or append to it.")
+    file_path: str = Field("logs/DDPG.log", description="File path to save log to.")
+
+class PendulumParams(BaseModel):
+    deterministic_initial_state: bool = Field(False, description="Use a deterministic initial state or add noise.")
+    initial_state: Literal['up', 'down'] = Field('up', description="Initial state of the pendulum (up or down).")
+    time_step: float = Field(0.025, description="Time step for the simulation.")
+    mass_bob: float = Field(1.0, description="Mass of the bob.")
+    mass_base: float = Field(1.0, description="Mass of the base.")
+    length: float = Field(1.0, description="Length of the pendulum.")
+    gravity: float = Field(9.81, description="Acceleration due to gravity.")
+    termination: TerminationParams = TerminationParams()
+    logging: LoggingParams = LoggingParams()
 
 class InitFromWeights(BaseModel):
     enable: bool = Field(False, description="Enable loading initial weights from a file.")
-    file_name: Optional[str] = Field(None, description="Filename for loading initial weights.")
+    file_path: Optional[str] = Field(None, description="Filename for loading initial weights.")
 
 class SaveWeights(BaseModel):
     enable: bool = Field(False, description="Enable saving model weights to a file.")
-    file_name: Optional[str] = Field(None, description="Filename for saving model weights.")
-    save_frequency: Optional[int] = Field(50, description="Save weights every n episodes")
+    file_path: Optional[str] = Field(None, description="Filename for saving model weights.")
+    save_frequency: Optional[int] = Field(50, description="Save weights every n episodes.")
 
-class DQNParams(BaseModel):
-    epsilon_init: float = Field(1, description="Initial epsilon value (for epsilon-greedy policy).")
-    epsilon_min: float = Field(0.1, description="Minimum epsilon value.")
-    epsilon_decay: float = Field(0.995, description="Epsilon decay rate.")
-
-class ModelParams(BaseModel):
-    type: str = Field("REINFORCE", description="Type of model to use, either 'REINFORCE', 'DQN' or 'DDPG'.")
-    discount_factor: float = Field(0.99, description="Discount factor for future rewards.")
-    learning_rate: float = Field(0.001, description="Learning rate for the optimizer.")
-    layer_sizes: List[int] = Field([20, 20], description="List specifying the number of neurons in each layer.")
-    termination_penalty: float = Field(-5, description="Penalty for termination.")
-
+class IOParameters(BaseModel):
     init_from_weights: InitFromWeights = InitFromWeights()
     save_weights: SaveWeights = SaveWeights()
+
+class EpsilonParams(BaseModel):
+    epsilon_init: float = Field(1, description="Initial epsilon value (for epsilon-greedy policy).")
+    epsilon_min: float = Field(0.1, description="Minimum epsilon value.")
+    epsilon_decay: float = Field(0.9, description="Epsilon decay rate.")
+
+class DQNParams(BaseModel):
+    hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
+    learning_rate: float = Field(1e-3, description="Learning rate for the optimizer.")
+    epsilon: EpsilonParams = EpsilonParams()
+
+class REINFORCEParams(BaseModel):
+    hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
+    learning_rate: float = Field(1e-3, description="Learning rate for the optimizer.")
+
+class DDPGActorParams(BaseModel):
+    hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
+    learning_rate: float = Field(1e-5, description="Learning rate for the optimizer.")
+    polyak: float = Field(0.95, description="Polyak averaging parameter for target network updates.")
     
-    DQN_params: DQNParams = DQNParams()
-    
-    @validator('type')
-    def validate_model_type(cls, v):
-        if v not in ['REINFORCE', 'DQN', 'DDPG']:
-            raise ValueError('type must be either "REINFORCE", "DQN" or "DDPG"')
-        return v
+    class NoiseParams(BaseModel):
+        enable: bool = Field(True, description="Enable addition of noise to action for exploration.")
+        std_init: float = Field(1, description="Initial standard deviation of the noise.")
+        std_min: float = Field(0.1, description="Minimum standard deviation of the noise.")
+        decay: float = Field(0.97, description="Noise standard deviation decay rate (per episode).")
+
+    noise: NoiseParams = NoiseParams()
+
+class DDPGCriticParams(BaseModel):
+    state_input_layer_sizes: List[int] = Field([8], description="Number of neurons in layers receiving the state input.")
+    action_input_layer_sizes: List[int] = Field([8], description="Number of neurons in layers receiving the action input.")
+    combined_layer_sizes: List[int] = Field([16, 8, 8], description="Number of neurons in each layer for combined state and action input.")
+    learning_rate: float = Field(1e-3, description="Learning rate for the optimizer.")
+    polyak: float = Field(0.95, description="Polyak averaging parameter for target network updates.")
+
+class DDPGParams(BaseModel):
+    actor: DDPGActorParams = DDPGActorParams()
+    critic: DDPGCriticParams = DDPGCriticParams()
+
+class ModelParams(BaseModel):
+    type: Literal['DQN', 'REINFORCE', 'DDPG'] = Field("DDPG", description="Type of model to use.")
+    memory_size: int = Field(1000, description="Size of the replay memory buffer.")
+    batch_size: int = Field(16, description="Mini-batch size for training.")
+    discount_factor: float = Field(0.95, description="Discount factor for future rewards.")
+    force_magnitude: float = Field(20, description="Magnitude of the force applied to the base.")
+
+    IO_parameters: IOParameters = IOParameters()
+    DQN: DQNParams = DQNParams()
+    REINFORCE: REINFORCEParams = REINFORCEParams()
+    DDPG: DDPGParams = DDPGParams()
 
 class RunParams(BaseModel):
-    type: str = Field("train", description="Run mode: 'train' or 'test'.")
-    num_episodes: int = Field(1000, description="Number of episodes to run.")
-    episode_time: float = Field(25, description="Maximum episode time in seconds.")
-    dt: float = Field(0.025, description="Time step in seconds.")
-    batch_size: int = Field(32, description="Mini-batch size for training.")
-    
-    @validator('type')
-    def validate_run_type(cls, v):
-        if v not in ['train', 'test']:
-            raise ValueError('type must be either "train" or "test"')
-        return v
-    
-class PendulumEnvParams(BaseModel):
-    length: float = Field(1.0, description="Length of the pendulum.")
-    mass_base: float = Field(1.0, description="Mass of the base.")
-    mass_bob: float = Field(1.0, description="Mass of the bob.")
+    type: Literal['train', 'test'] = Field("test", description="Run mode: 'train' or 'test'.")
+    num_episodes: int = Field(512, description="Number of episodes to run.")
+    batch_size: int = Field(16, description="Mini-batch size for training.")
 
 class Config(BaseModel):
     run: RunParams = RunParams()
+    pendulum: PendulumParams = PendulumParams()
     model: ModelParams = ModelParams()
-    pendulum_env: PendulumEnvParams = PendulumEnvParams()
 
 def read_data_from_yaml(full_file_path, data_class):
-        with open(full_file_path, 'r') as stream:
-            yaml = ruamel.yaml.YAML(typ='safe', pure=True)
-            yaml_str = yaml.load(stream)
-
-        return data_class(**yaml_str)
+    with open(full_file_path, 'r') as stream:
+        yaml = ruamel.yaml.YAML(typ='safe', pure=True)
+        yaml_str = yaml.load(stream)
+    return data_class(**yaml_str)
