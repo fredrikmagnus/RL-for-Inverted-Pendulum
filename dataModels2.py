@@ -20,11 +20,11 @@ class PendulumParams(BaseModel):
 
 class InitFromWeights(BaseModel):
     enable: bool = Field(False, description="Enable loading initial weights from a file.")
-    file_name: Optional[str] = Field(None, description="Filename for loading initial weights.")
+    file_path: Optional[str] = Field(None, description="Filename for loading initial weights.")
 
 class SaveWeights(BaseModel):
     enable: bool = Field(False, description="Enable saving model weights to a file.")
-    file_name: Optional[str] = Field(None, description="Filename for saving model weights.")
+    file_path: Optional[str] = Field(None, description="Filename for saving model weights.")
     save_frequency: Optional[int] = Field(50, description="Save weights every n episodes.")
 
 class IOParameters(BaseModel):
@@ -72,6 +72,7 @@ class DDPGParams(BaseModel):
 class ModelParams(BaseModel):
     type: Literal['DQN', 'REINFORCE', 'DDPG'] = Field("DDPG", description="Type of model to use.")
     memory_size: int = Field(1000, description="Size of the replay memory buffer.")
+    batch_size: int = Field(16, description="Mini-batch size for training.")
     discount_factor: float = Field(0.95, description="Discount factor for future rewards.")
     force_magnitude: float = Field(20, description="Magnitude of the force applied to the base.")
 
@@ -83,7 +84,6 @@ class ModelParams(BaseModel):
 class RunParams(BaseModel):
     type: Literal['train', 'test'] = Field("test", description="Run mode: 'train' or 'test'.")
     num_episodes: int = Field(512, description="Number of episodes to run.")
-    episode_time: float = Field(25, description="Maximum episode time in seconds.")
     batch_size: int = Field(16, description="Mini-batch size for training.")
 
 class Config(BaseModel):

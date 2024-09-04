@@ -17,6 +17,7 @@ class Pendulum:
         self.termination_penalty = config.termination.termination_penalty # Penalty for terminating the episode early
         self.time_step = config.time_step # Time step for the simulation
         self.g = config.gravity # Acceleration due to gravity (m/s^2)
+        self.time = 0 # Current time in the episode
 
     def derivate_state(self, state, force):
         """
@@ -58,6 +59,7 @@ class Pendulum:
         init_angle = -np.pi/2 if down else np.pi/2
         self.state = np.array([0, 0, 0, 0, init_angle, 0]) + noise
         self.terminated = False
+        self.time = 0
 
         return self.state
     
@@ -111,58 +113,26 @@ class Pendulum:
         """
 
         self.update(force)
+        reward = self.reward()
+        self.time += self.time_step
 
         # Check termination:
         abs_pos = np.abs(self.state[0])
         abs_angle = np.abs(self.state[4]-np.pi/2)
         if self.angle_lim is not None and abs_angle > self.angle_lim:
             self.terminated = True
+            reward = self.termination_penalty
+            
         if self.x_lim is not None and abs_pos > self.x_lim:
             self.terminated = True
+            reward = self.termination_penalty
 
-        reward = self.reward() if not self.terminated else self.termination_penalty
+        if self.time_limit is not None and self.time > self.time_limit:
+            self.terminated = True
 
         return self.state, reward, self.terminated # New-state, reward, done
-    
-    # def step(self, action, dt):
-    #     """ Returns: state, reward, done """
-    #     # We assume for now that the action is either 0 (left) or 1 (right)
-    #     if action == 0: action = -1 # Convert action 0 (left) to -1
-    #     angle = self.state[4]
-    #     min_force = 20
-    #     max_force = 25
-    #     force = lambda theta: min_force+np.abs(theta-np.pi/2)/self.angle_lim * (max_force-min_force) # Force is higher given higher angle error
-    #     self.update(np.array([action*force(angle), 0]))
-        
-    #     # Check termination:
-    #     abs_pos = np.abs(self.state[0])
-    #     abs_angle = np.abs(self.state[4]-np.pi/2)
-    #     if abs_pos > self.x_lim or abs_angle > self.angle_lim: # Terminate if outside limits
-    #         self.terminated = True
-    #     # if abs_pos > self.x_lim: # Terminates if outside x limits
-    #     #     self.terminated = True
-    #     return self.state, self.reward(), self.terminated # New-state, reward, done
-    
-    # def step_continuous(self, action, dt):
-    #     """ Returns: state, reward, done """
-    #     # We assume for now that the action is a continuous value between -1 and 1
-    #     angle = self.state[4]
-    #     min_force = -30
-    #     max_force = 30
-    #     # Interpolate force between -30 and 30 given the action
-    #     force = min_force + (action[0][0]+1)/2 * (max_force-min_force)
-    #     self.update(np.array([force, 0]), 9.8, dt)
 
-    #     # Check termination:
-    #     abs_pos = np.abs(self.state[0])
-    #     abs_angle = np.abs(self.state[4]-np.pi/2)
-    #     # if abs_pos > self.x_lim or abs_angle > self.angle_lim: # Terminate if outside limits
-    #     #     self.terminated = True
-    #     if abs_pos > self.x_lim: # Terminates if outside x limits
-    #         self.terminated = True
-    #     return self.state, self.reward(), self.terminated # New-state, reward, done
-        
-    
+           
     def animate(self, agent, continuous=False):
         import pygame as pg
 

@@ -7,15 +7,14 @@ from keras.optimizers import Adam
 from collections import deque
 from keras.losses import MeanSquaredError
 import os
-from dataModels2 import ModelParams, DQNParams, REINFORCEParams, DDPGParams, Config, RunParams
+from dataModels2 import ModelParams, DQNParams, REINFORCEParams, DDPGParams, Config, RunParams, DDPGActorParams, DDPGCriticParams
 from pendulum2 import Pendulum
 
 class DQNAgent:
     def __init__(self, config : ModelParams) -> None:
         self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
         self.action_size = 2 # Number of actions (force left or right)
-        # self.hidden_layer_sizes = config.DQN.hidden_layer_sizes # List specifying the number of neurons in each layer
-        # self.learning_rate = config.DQN.learning_rate # Learning rate for the optimizer
+
         self.memory = deque(maxlen = config.memory_size) # Circular buffer used to store transitions to learn from.
         self.gamma = config.discount_factor # Discount rate
         self.eps_init = config.DQN.epsilon.epsilon_init # Epsilon for epsilon-greedy policy
@@ -23,6 +22,8 @@ class DQNAgent:
         self.epsilon_decay = config.DQN.epsilon.epsilon_decay # Epsilon decay rate
         self.force_magnitude = config.force_magnitude # Magnitude of the force applied to the base
         self.model = self.build_model(config.DQN)
+        if config.IO_parameters.init_from_weights.enable:
+            self.load_weights(config.IO_parameters.init_from_weights.file_path)
 
     def build_model(self, config : DQNParams):
         model = Sequential()
@@ -37,10 +38,6 @@ class DQNAgent:
         self.memory.append((state, action, reward, next_state, done))
 
     def act(self, state):
-        # if np.random.rand() <= self.eps_init:
-        #     return random.randrange(self.action_size)
-        # act_values = self.model.predict(state, verbose=0)
-        # return np.argmax(act_values[0])
 
         if np.random.rand() <= self.eps_init:
             action = random.randrange(self.action_size) # Random action (0:left or 1:right)
@@ -87,15 +84,17 @@ class DQNAgent:
     
     def train(self, env : Pendulum, config : Config):
         num_episodes = config.run.num_episodes # Number of episodes to run
-        episode_time = config.run.episode_time # Maximum episode time in seconds
-        batch_size = config.run.batch_size # Mini-batch size for training
-        episode_steps = int(episode_time/env.time_step) # Number of time steps in an episode
+        # episode_time = config.run.episode_time # Maximum episode time in seconds
+        batch_size = config.model.batch_size # Mini-batch size for training
+        # episode_steps = int(episode_time/env.time_step) # Number of time steps in an episode
 
         for e in range(num_episodes):
             state = env.reset() # Reset the environment
             state = self.get_state_representation(state) # Get state representation
             
-            for time_step in range(episode_steps):
+            time_step = 0
+            done = False
+            while not done: # Play episode
                 force, action = self.act(state) # Get action from agent
                 next_state, reward, done = env.step(force) # Take action in environment
                 next_state = self.get_state_representation(next_state) # Get state representation
@@ -106,9 +105,10 @@ class DQNAgent:
                 if len(self.memory) > batch_size: # Train agent
                     self.replay(batch_size)
                 state = next_state
+                time_step += 1
             if config.model.IO_parameters.save_weights.enable:
                 if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
-                    self.save(os.path.join('weights', config.model.IO_parameters.save_weights.file_name))
+                    self.save(config.model.IO_parameters.save_weights.file_path)
 
 
     def load_weights(self, filepath):
@@ -129,6 +129,8 @@ class REINFORCEAgent:
         self.force_magnitude = config.force_magnitude # Magnitude of the force applied to the base
         self.gamma = config.discount_factor # Discount rate
         self.model = self.build_model()
+        if config.IO_parameters.init_from_weights.enable:
+            self.load_weights(config.IO_parameters.init_from_weights.file_path)
 
     def custom_loss(self, y_true, y_pred):
         # We now redefine the loss-function to avoid having to store the rewards in a class.
@@ -175,26 +177,28 @@ class REINFORCEAgent:
         return state
     
     def train(self, env : Pendulum, config : Config):
-        dt = env.time_step # Time step in seconds
         num_episodes = config.run.num_episodes # Number of episodes to run
-        episode_time = config.run.episode_time # Maximum episode time in seconds
-        batch_size = config.run.batch_size # Mini-batch size for training
-        episode_steps = int(episode_time/dt) # Number of time steps in an episode
+        batch_size = config.model.batch_size # Mini-batch size for training
 
         for e in range(num_episodes): # Loop over episodes
             state = env.reset() # Reset the environment
             state = self.get_state_representation(state) # Get state representation
             
             ep = [] # List of tuples (state, action, reward)
-            for time_step in range(episode_steps): # Play episode
+            time_step = 0
+            done = False
+            R = 0
+            while not done: # Play episode
                 force, action = self.act(state) # Get action from agent
                 next_state, reward, done = env.step(force) # Take action in environment
+                R += reward # Add reward to total reward
                 next_state = self.get_state_representation(next_state) # Get state representation
                 ep.append((state, action, reward)) # Add state, action, reward to episode history
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {time_step}")
+                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}")
                     break
                 state = next_state # Update state
+                time_step += 1 # Increment time step
             
             # Compute G for each time step in episode
             R = [reward for state, action, reward in ep]
@@ -213,7 +217,7 @@ class REINFORCEAgent:
 
             if config.model.IO_parameters.save_weights.enable:
                 if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
-                    self.save(os.path.join('weights', config.model.IO_parameters.save_weights.file_name))
+                    self.save(config.model.IO_parameters.save_weights.file_path)
             
 
     def load_weights(self, filepath):
@@ -225,55 +229,67 @@ class REINFORCEAgent:
 
 
 class DDPGAgent:
-    def __init__(self, state_shape, action_size, actor_lr, critic_lr, gamma, rho, buffer_size, batch_size):
-        self.state_shape = state_shape
-        self.action_size = action_size
-        self.gamma = gamma
-        self.rho = rho
-        self.memory = deque(maxlen=buffer_size)
-        self.batch_size = batch_size
-        
-        # Actor Network
-        self.actor_model = self.build_actor(state_shape, action_size, actor_lr)
-        self.target_actor_model = self.build_actor(state_shape, action_size, actor_lr)
-        self.target_actor_model.set_weights(self.actor_model.get_weights())
+    def __init__(self, config : ModelParams) -> None:
+        self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
+        self.action_size = 1
+        self.memory = deque(maxlen=config.memory_size)
+        self.batch_size = config.batch_size
+        self.gamma = config.discount_factor
 
-        # Critic Network
-        self.critic_model = self.build_critic(state_shape, action_size, critic_lr)
-        self.target_critic_model = self.build_critic(state_shape, action_size, critic_lr)
+        self.polyak_critic = config.DDPG.critic.polyak # Polyak averaging parameter for critic target network
+        self.polyak_actor = config.DDPG.actor.polyak # Polyak averaging parameter for actor target network
+
+
+        self.force_magnitude = config.force_magnitude
+
+        self.actor_model, self.critic_model = self.build_model(config=config.DDPG)
+        if config.IO_parameters.init_from_weights.enable:
+            self.load_weights(config.IO_parameters.init_from_weights.file_path)
+
+        self.target_actor_model, self.target_critic_model = self.build_model(config=config.DDPG)
+        self.target_actor_model.set_weights(self.actor_model.get_weights())
         self.target_critic_model.set_weights(self.critic_model.get_weights())
 
-        # Noise process
-        self.noise_variance = 1
-        self.noise = lambda: np.random.normal(loc=0, scale=self.noise_variance, size=self.action_size)
+        # Noise
+        self.noise_std = config.DDPG.actor.noise.std_init if config.DDPG.actor.noise.enable else 0
 
-    def build_actor(self, state_shape, action_size, learning_rate):
+    def build_model(self, config : DDPGParams):
         # Build the actor network
-        state_input = Input(shape=state_shape)
-        h = Dense(8, activation='relu')(state_input)
-        h = Dense(8, activation='relu')(h)
-        h = Dense(8, activation='relu')(h)
-        output = Dense(action_size, activation='tanh')(h)
-        model = Model(inputs=state_input, outputs=output)
-        model.compile(optimizer=Adam(learning_rate))
-        return model
+        state_input = Input(shape=self.state_shape)
+        h = Dense(config.actor.hidden_layer_sizes[0], activation='relu')(state_input)
+        for layer_size in config.actor.hidden_layer_sizes[1:]:
+            h = Dense(layer_size, activation='relu')(h)
+        output = Dense(self.action_size, activation='tanh')(h)
 
-    def build_critic(self, state_shape, action_size, learning_rate):
+        actor_model = Model(inputs=state_input, outputs=output)
+        actor_model.compile(optimizer=Adam(config.actor.learning_rate))
+
+
         # Build the critic network
-        state_input = Input(shape=state_shape)
-        state_h = Dense(8, activation='relu')(state_input)
+        # State input layers
+        state_input = Input(shape=self.state_shape)
+        state_h = Dense(config.critic.state_input_layer_sizes[0], activation='relu')(state_input)
+        for layer_size in config.critic.state_input_layer_sizes[1:]:
+            state_h = Dense(layer_size, activation='relu')(state_h)
+        
+        # Action input layers
+        action_input = Input(shape=(self.action_size,))
+        action_h = Dense(config.critic.action_input_layer_sizes[0], activation='relu')(action_input)
+        for layer_size in config.critic.action_input_layer_sizes[1:]:
+            action_h = Dense(layer_size, activation='relu')(action_h)
 
-        action_input = Input(shape=(action_size,))
-        action_h = Dense(8, activation='relu')(action_input)
-
+        # Combine state and action inputs
         concat = Concatenate()([state_h, action_h])
-        h = Dense(16, activation='relu')(concat)
-        h = Dense(8, activation='relu')(h)
-        h = Dense(8, activation='relu')(h)
+        h = Dense(config.critic.combined_layer_sizes[0], activation='relu')(concat)
+        for layer_size in config.critic.combined_layer_sizes[1:]:
+            h = Dense(layer_size, activation='relu')(h)
+
+        # Output layer
         output = Dense(1, activation='linear')(h)
-        model = Model(inputs=[state_input, action_input], outputs=output)
-        model.compile(optimizer=Adam(learning_rate), loss='mse')
-        return model
+        critic_model = Model(inputs=[state_input, action_input], outputs=output)
+        critic_model.compile(optimizer=Adam(config.critic.learning_rate), loss='mse')
+
+        return actor_model, critic_model
     
     def get_state_representation(self, state):
         state = state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
@@ -284,13 +300,15 @@ class DDPGAgent:
     def remember(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
 
-    def act(self, state, noise=True):
+    def act(self, state):
         action = self.actor_model.predict(state, verbose=0)
 
-        if noise:
-            action = action + self.noise() # Add noise for exploration
+        if self.noise_std > 0:
+            noise = np.random.normal(loc=0, scale=self.noise_std, size=action.shape) # Generate noise
+            action = action + noise # Add noise for exploration
 
-        return np.clip(action, -1, 1) # Ensure action is within bounds
+        force = action.squeeze()*self.force_magnitude # Convert action to force value
+        return np.array([force, 0]), action
 
     def replay(self):
         if len(self.memory) < self.batch_size:
@@ -352,26 +370,22 @@ class DDPGAgent:
         del tape
 
         # Update target networks
-        self.update_target(self.target_actor_model, self.actor_model)
-        self.update_target(self.target_critic_model, self.critic_model)
+        self.update_target(self.target_actor_model, self.actor_model, self.polyak_actor)
+        self.update_target(self.target_critic_model, self.critic_model, self.polyak_critic)
 
-    def train(self, env, config):
-        dt = config.run.dt # Time step in seconds
+    def train(self, env : Pendulum, config : Config):
         num_episodes = config.run.num_episodes # Number of episodes to run
-        episode_time = config.run.episode_time # Maximum episode time in seconds
-        batch_size = config.run.batch_size # Mini-batch size for training
-        episode_steps = int(episode_time/dt) # Number of time steps in an episode
         
-
         for e in range(num_episodes):
-            state = env.reset(deterministic=False, down = True)
+            state = env.reset()
             state = self.get_state_representation(state)
             R = 0
-            for time_step in range(episode_steps):
-                action = self.act(state)
-                next_state, reward, done = env.step_continuous(action, dt)
+            time_step = 0
+            done = False
+            while not done:
+                force, action = self.act(state)
+                next_state, reward, done = env.step(force)
                 next_state = self.get_state_representation(next_state)
-                reward = reward if not done else config.model.termination_penalty
                 R += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
@@ -379,14 +393,14 @@ class DDPGAgent:
                     break
                 self.replay()
                 state = next_state
-            if config.model.save_weights.enable:
-                if e%config.model.save_weights.save_frequency == 0 and e != 0:
-                    self.save(os.path.join('weights', config.model.save_weights.file_name))
-            
-        self.noise_variance *= 0.97
-        self.noise = lambda: np.random.normal(loc=0, scale=self.noise_variance, size=self.action_size)
+            if config.model.IO_parameters.save_weights.enable:
+                if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
+                    self.save(config.model.IO_parameters.save_weights.file_path)
+        
+        if self.noise_std > config.model.DDPG.actor.noise.std_min:
+            self.noise_std *= config.model.DDPG.actor.noise.decay 
 
-    def update_target(self, target_model, model):
+    def update_target(self, target_model, model, polyak):
         # Get the weights of both models
         target_weights = target_model.get_weights()
         weights = model.get_weights()
@@ -395,7 +409,7 @@ class DDPGAgent:
         new_weights = []
         for target_weight, weight in zip(target_weights, weights):
             # Perform the soft update
-            updated_weight = self.rho * target_weight + (1 - self.rho) * weight
+            updated_weight = polyak * target_weight + (1 - polyak) * weight
             new_weights.append(updated_weight)
         
         # Set the new weights to the target model
