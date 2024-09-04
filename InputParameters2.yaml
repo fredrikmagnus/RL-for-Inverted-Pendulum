@@ -7,34 +7,34 @@ run:
 
 pendulum:
   deterministic_initial_state: False # Use a deterministic initial state or add noise
-  initial_state: up # Initial state of the pendulum (up, down)
-  time_step: 0.025 # Time step for the simulation
+  initial_state: down # Initial state of the pendulum (up, down)
+  time_step: 0.05 # Time step for the simulation
   mass_bob: 1.0 # Mass of the bob
   mass_base: 1.0 # Mass of the base
   length: 1.0 # Length of the pendulum
   gravity: 9.81 # Acceleration due to gravity
 
   termination:
-    angle_limit: 30 # Angle limit for the pendulum (in degrees). Set to None for no limit.
-    x_limit: 7 # x limit for the pendulum (in meters). Set to None for no limit.
-    time_limit: 15 # Time limit for the episode (in seconds). Must be greater than 0.
-    termination_penalty: -2 # Penalty for terminating the episode early.
+    angle_limit: null # Angle limit for the pendulum (in degrees). Set to 'null' for no limit.
+    x_limit: 6 # x limit for the pendulum (in meters). Set to None for no limit.
+    time_limit: 5 # Time limit for the episode (in seconds). Must be greater than 0.
+    termination_penalty: -3 # Penalty for terminating the episode early.
 
 model:
-  type: DQN # DQN, REINFORCE or DDPG
+  type: DDPG # DQN, REINFORCE or DDPG
   memory_size: 512 # Size of the replay memory buffer
   batch_size: 16 # Mini-batch size for training
   discount_factor: 0.95 # Discount factor for future rewards
-  force_magnitude: 20 # Magnitude of the force applied to the pendulum (max force for DDPG)
+  force_magnitude: 50 # Magnitude of the force applied to the pendulum (max force for DDPG)
 
 
   IO_parameters: # Input and output parameters for the model
     init_from_weights: 
-      enable: False # Initialize model from weights
-      file_path: "weights\\DQN.keras" # File path to load weights from
+      enable: True # Initialize model from weights
+      file_path: "weights/DDPG_down.keras" # File path to load weights from
     save_weights:
       enable: True # Save weights to file
-      file_path: "weights\\DQN.keras" # File path to save weights to
+      file_path: "weights/DDPG_down.keras" # File path to save weights to
       save_frequency: 1 # Save weights every n episodes
 
   DQN:
@@ -52,21 +52,21 @@ model:
   DDPG:
     actor:
       hidden_layer_sizes: [8, 8, 8] # Number of neurons in each layer
-      learning_rate: 1e-5 # Learning rate for the optimizer
-      polyak: 0.95 # Polyak averaging parameter for target network updates
+      learning_rate: 1e-4 # Learning rate for the optimizer
+      polyak: 0.98 # Polyak averaging parameter for target network updates
       
       noise:
         enable: True # Enable addition of noise to action for exploration
-        std_init: 1 # Standard deviation of the noise
-        std_min: 0.1 # Minimum standard deviation of the noise
-        decay: 0.97 # Noise standard deviation decay rate (per episode)
+        std_init: 0.4 # Standard deviation of the noise
+        std_min: 0.05 # Minimum standard deviation of the noise
+        decay: 0.995 # Noise standard deviation decay rate (per episode)
 
     critic:
       state_input_layer_sizes: [8] # Number of neurons in the layers receiving the state input
       action_input_layer_sizes: [8] # Number of neurons the layers receiving the action input
       combined_layer_sizes: [16, 8, 8] # Number of neurons in each layer for combined state and action input
       learning_rate: 1e-3 # Learning rate for the optimizer
-      polyak: 0.95 # Polyak averaging parameter for target network updates
+      polyak: 0.98 # Polyak averaging parameter for target network updates
     
 
   

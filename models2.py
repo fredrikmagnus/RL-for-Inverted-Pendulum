@@ -313,7 +313,7 @@ class DDPGAgent:
     def replay(self):
         if len(self.memory) < self.batch_size:
             return
-
+        print("Running replay...")
         # Sample a minibatch from memory
         minibatch = random.sample(self.memory, self.batch_size)
 
@@ -389,16 +389,17 @@ class DDPGAgent:
                 R += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}")
+                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}, noise std: {self.noise_std:.3}")
                     break
                 self.replay()
                 state = next_state
+                time_step += 1
             if config.model.IO_parameters.save_weights.enable:
                 if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
                     self.save(config.model.IO_parameters.save_weights.file_path)
         
-        if self.noise_std > config.model.DDPG.actor.noise.std_min:
-            self.noise_std *= config.model.DDPG.actor.noise.decay 
+            if self.noise_std > config.model.DDPG.actor.noise.std_min:
+                self.noise_std *= config.model.DDPG.actor.noise.decay 
 
     def update_target(self, target_model, model, polyak):
         # Get the weights of both models

@@ -48,6 +48,8 @@ class Pendulum:
         
         self.state[4] = self.state[4] % (2*np.pi) # Keep angle between 0 and 2pi
 
+        
+
     def reset(self):
         """
         Resets the environment to the initial state.
@@ -64,44 +66,57 @@ class Pendulum:
         return self.state
     
     def reward(self):
-        # rmax_theta = 1
-        # rmin_theta = .5
-        # theta0 = np.pi/2
-        # dtheta = self.angle_lim
-        # thetamin = np.pi/2-dtheta
-        # a_theta = (rmax_theta-rmin_theta)/(theta0**2 - 2*thetamin*theta0 + thetamin**2)
-        # b_theta = -2*a_theta*thetamin
-        # c_theta = a_theta*thetamin**2 + rmin_theta
-        # theta = self.state[4]
-        # r_theta = a_theta*theta**2 + b_theta*theta + c_theta if theta<=np.pi/2 else a_theta*(theta-2*dtheta)**2 + b_theta*(theta-2*dtheta) + c_theta
 
-        # rmax_x = .3
-        # rmin_x = -.2
-        # dx = self.x_lim
-        # a1=(rmax_x-rmin_x)/dx
-        # a2=-a1
-        # b=rmax_x
-        # x = self.state[0]
-        # r_pos =  a1*x+b if x<= 0 else a2*x+b
+        # Reward function:
+        # First we have a reward for increasing the height of the bob. 
+        # This is determined by the angle theta, assuming theta = 0 is the vertical position.
+        # It is R_max at the top and decreases exponentially as the angle increases towards pi (downwards).
+        # R(theta) = R_max * exp(-k * abs(x)) * sin((pi - abs(x)) / 2), let k = 1
 
-        # return r_theta+r_pos
-        # return 1
+        # Now we add a scaling factor for the reward based on the x position of the base. 
+        # This scaling factor is S_max at the center and decreases exponentially towards S_min when x = x_lim.
+        # S(x) = (S_max - S_min) * exp(-k * abs(x)) * sin(pi/2 - pi/(2*x_lim) * abs(x)) + S_min 
 
-        # x = self.state[0]
-        # x_lim = self.x_lim
-        # reward = 1 - abs(x) / x_lim
-        # return max(reward, 0)
+        # Lastly we want to reward the agent for getting to the top fast. 
+        # To do this we add a scaling factor which depends on the time. It starts at some high value and decreases towards 1 as the time increases.
+        # For this we can use a sigmoid function.
+        # f(x) = A + (1 - A) / (1 + exp(-k * (t - t_0))), where A is the scaling factor at t=0, t_0 is the time at which the scaling factor is (A-1)/2, and k is a constant determining the steepness of the sigmoid (4 looks good).
 
-        # # Reward for swinging up
-        # angle = self.state[4]
-        # R1 = np.sin(angle) # Reward for upright position
-        # x_pos = self.state[0]
-        # R2 = -0.5*np.abs(x_pos/self.x_lim) # Reward for being close to center
-        # return R1 + R2 +1 # Total reward
+        # 1) Convert the angle to the range [-pi, pi] with 0 being the vertical position
+        angle = self.state[4] - np.pi/2 # make 0 the vertical position
+        # Convert angle to range -pi to pi
+        if angle > np.pi:
+            angle -= 2*np.pi
         
-        sin_angle = np.sin(self.state[4])
+        # 2) Calculate the reward for the angle
+        R_max = 1
+        k = 1
+        angle_reward = R_max * np.exp(-k * np.abs(angle)) * np.sin((np.pi - np.abs(angle)) / 2)
+
+        # 3) Calculate the scaling for the x position
+        S_max = 1.5
+        S_min = 0.75
+        x = self.state[0] # x position of the base
+        x_pos_scaling = (S_max - S_min) * np.exp(-k * np.abs(x)) * np.sin(np.pi/2 - np.pi/(2*self.x_lim) * np.abs(x)) + S_min
+
+        # 4) Calculate the scaling for the time
+        # A = 1.5
+        # t_0 = 2
+        # k = 4
+        # time_scaling = A + (1 - A) / (1 + np.exp(-k * (self.time - t_0))) # Time is not an input, so on second thought this might be detrimental
+
+        # 5) Penalize high angular velocity.
+        # We add a penalty for high angular velocity using a scaling of the reward based on the angular velocity.
+        # This scaling is 1 at 0 angular velocity and decreases exponentially towards 0 as the angular velocity increases.
+        angular_vel_scaling = np.exp(-np.abs(self.state[5])/5)
+
+        # 5) Calculate the total reward
+        return angle_reward * x_pos_scaling * angular_vel_scaling #* time_scaling
+
+
+        # sin_angle = np.sin(self.state[4])
         
-        return 1 + sin_angle
+        # return 1 + sin_angle
         # return 1 if np.abs(angle) < np.pi/6 else 0
 
     def step(self, force):
@@ -142,7 +157,7 @@ class Pendulum:
         # FPS = 60 # frames per second setting
         fpsClock = pg.time.Clock()
 
-        dt = 0.025 # 1 / FPS # Seconds Per Frame = 1 / Frames Per Second
+        dt = 0.05 # 1 / FPS # Seconds Per Frame = 1 / Frames Per Second
 
 
         # Set up the drawing window
@@ -152,6 +167,7 @@ class Pendulum:
         screen = pg.display.set_mode(screen_dim)
 
         agent.eps = 0.0
+        agent.noise_std = 0.0
 
         running = True
         while running:
