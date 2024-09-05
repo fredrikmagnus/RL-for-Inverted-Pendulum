@@ -30,16 +30,16 @@ model:
   memory_size: 512 # Size of the replay memory buffer
   batch_size: 16 # Mini-batch size for training
   discount_factor: 0.95 # Discount factor for future rewards
-  force_magnitude: 50 # Magnitude of the force applied to the pendulum (max force for DDPG)
+  force_magnitude: 35 # Magnitude of the force applied to the pendulum (max force for DDPG)
 
 
   IO_parameters: # Input and output parameters for the model
     init_from_weights: 
-      enable: True # Initialize model from weights
+      enable: False # Initialize model from weights
       file_path: "weights/DDPG_down.keras" # File path to load weights from
     save_weights:
       enable: True # Save weights to file
-      file_path: "weights/DDPG_down.keras" # File path to save weights to
+      file_path: "weights/DDPG.keras" # File path to save weights to
       save_frequency: 1 # Save weights every n episodes
 
   DQN:
@@ -60,11 +60,10 @@ model:
       learning_rate: 1e-4 # Learning rate for the optimizer
       polyak: 0.98 # Polyak averaging parameter for target network updates
       
-      noise:
+      ornstein_uhlenbeck_noise:
         enable: True # Enable addition of noise to action for exploration
-        std_init: 0.4 # Standard deviation of the noise
-        std_min: 0.05 # Minimum standard deviation of the noise
-        decay: 0.995 # Noise standard deviation decay rate (per episode)
+        theta: 0.15 # Theta parameter for the Ornstein-Uhlenbeck noise process
+        sigma: 0.2 # Sigma parameter for the Ornstein-Uhlenbeck noise process
 
     critic:
       state_input_layer_sizes: [8] # Number of neurons in the layers receiving the state input

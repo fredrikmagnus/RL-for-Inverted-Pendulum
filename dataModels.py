@@ -51,19 +51,18 @@ class DQNParams(BaseModel):
 class REINFORCEParams(BaseModel):
     hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
     learning_rate: float = Field(1e-3, description="Learning rate for the optimizer.")
+    
+class NoiseParams(BaseModel):
+    enable: bool = Field(True, description="Enable addition of noise to action for exploration.")
+    theta: float = Field(0.15, description="Theta parameter for the Ornstein-Uhlenbeck noise process.")
+    sigma: float = Field(0.2, description="Sigma parameter for the Ornstein-Uhlenbeck noise process.")
 
 class DDPGActorParams(BaseModel):
     hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
     learning_rate: float = Field(1e-5, description="Learning rate for the optimizer.")
     polyak: float = Field(0.95, description="Polyak averaging parameter for target network updates.")
-    
-    class NoiseParams(BaseModel):
-        enable: bool = Field(True, description="Enable addition of noise to action for exploration.")
-        std_init: float = Field(1, description="Initial standard deviation of the noise.")
-        std_min: float = Field(0.1, description="Minimum standard deviation of the noise.")
-        decay: float = Field(0.97, description="Noise standard deviation decay rate (per episode).")
 
-    noise: NoiseParams = NoiseParams()
+    ornstein_uhlenbeck_noise: NoiseParams = NoiseParams()
 
 class DDPGCriticParams(BaseModel):
     state_input_layer_sizes: List[int] = Field([8], description="Number of neurons in layers receiving the state input.")

@@ -250,8 +250,9 @@ class DDPGAgent:
         self.target_actor_model.set_weights(self.actor_model.get_weights())
         self.target_critic_model.set_weights(self.critic_model.get_weights())
 
-        # Noise
-        self.noise_std = config.DDPG.actor.noise.std_init if config.DDPG.actor.noise.enable else 0
+        # Initialize noise for exploration
+        self.enable_noise = config.DDPG.actor.ornstein_uhlenbeck_noise.enable
+        self.noise = OrnsteinUhlenbeckNoise(mu=np.zeros(1), sigma=config.DDPG.actor.ornstein_uhlenbeck_noise.sigma, theta=config.DDPG.actor.ornstein_uhlenbeck_noise.theta, dt=0.05)
 
     def build_model(self, config : DDPGParams):
         # Build the actor network
@@ -303,8 +304,8 @@ class DDPGAgent:
     def act(self, state):
         action = self.actor_model.predict(state, verbose=0)
 
-        if self.noise_std > 0:
-            noise = np.random.normal(loc=0, scale=self.noise_std, size=action.shape) # Generate noise
+        if self.enable_noise:
+            noise = self.noise()
             action = action + noise # Add noise for exploration
         
         action = np.clip(action, -1, 1)
@@ -391,7 +392,7 @@ class DDPGAgent:
                 R += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}, noise std: {self.noise_std:.3}")
+                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}")
                     break
                 self.replay()
                 state = next_state
@@ -400,8 +401,6 @@ class DDPGAgent:
                 if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
                     self.save(config.model.IO_parameters.save_weights.file_path)
         
-            if self.noise_std > config.model.DDPG.actor.noise.std_min:
-                self.noise_std *= config.model.DDPG.actor.noise.decay 
 
     def update_target(self, target_model, model, polyak):
         # Get the weights of both models
@@ -427,3 +426,20 @@ class DDPGAgent:
         base, extension = os.path.splitext(filepath)
         self.actor_model.save(base + '_actor' + extension)
         self.critic_model.save(base + '_critic' + extension)
+
+
+class OrnsteinUhlenbeckNoise:
+    """
+    Ornstein-Uhlenbeck process for exploration in DDPG (as suggested in https://arxiv.org/pdf/1509.02971)
+    """
+    def __init__(self, mu, sigma=0.3, theta=.15, dt=1e-2, x0=None):
+        self.theta = theta
+        self.mu = mu
+        self.sigma = sigma
+        self.dt = dt
+        self.x_prev = x0 if x0 is not None else np.zeros_like(self.mu)
+
+    def __call__(self):
+        x = self.x_prev + self.theta * (self.mu - self.x_prev) * self.dt + self.sigma * np.sqrt(self.dt) * np.random.normal(size=self.mu.shape)
+        self.x_prev = x
+        return x
