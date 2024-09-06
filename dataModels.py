@@ -56,6 +56,7 @@ class NoiseParams(BaseModel):
     enable: bool = Field(True, description="Enable addition of noise to action for exploration.")
     theta: float = Field(0.15, description="Theta parameter for the Ornstein-Uhlenbeck noise process.")
     sigma: float = Field(0.2, description="Sigma parameter for the Ornstein-Uhlenbeck noise process.")
+    sigma_decay: float = Field(1, description="Decay rate for sigma parameter.")
 
 class DDPGActorParams(BaseModel):
     hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")

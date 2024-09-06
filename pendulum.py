@@ -37,12 +37,12 @@ class Pendulum:
             # File does not exist, create it and write the header and the first episode
             with open(self.log_file_path, 'w') as f:
                 # Write the header
-                f.write('ep,state,action\n')
+                f.write('ep,state,action,reward\n')
                 
                 # Write the state-action pairs for the first episode (ep=0)
-                for state, action in self.episode_log:
+                for state, action, reward in self.episode_log:
                     # Convert the state to a string and write to file
-                    f.write(f'0,"{state}",{action}\n')
+                    f.write(f'0,"{state}",{action},{reward}\n')
         else:
             # File exists, read the last episode number
             df = pd.read_csv(self.log_file_path)
@@ -56,9 +56,9 @@ class Pendulum:
             # Open the file in append mode and write the new episode data
             with open(self.log_file_path, 'a') as f:
                 # Write the state-action pairs for the new episode
-                for state, action in self.episode_log:
+                for state, action, reward in self.episode_log:
                     # Convert the state to a string and write to file
-                    f.write(f'{new_ep},"{state}",{action}\n')
+                    f.write(f'{new_ep},"{state}",{action},{reward}\n')
 
         self.episode_log = [] # Clear the episode log
         
@@ -121,26 +121,26 @@ class Pendulum:
         # This scaling factor is S_max at the center and decreases exponentially towards S_min when x = x_lim.
         # S(x) = (S_max - S_min) * exp(-k * abs(x)) * sin(pi/2 - pi/(2*x_lim) * abs(x)) + S_min 
 
-        # Lastly we want to reward the agent for getting to the top fast. 
-        # To do this we add a scaling factor which depends on the time. It starts at some high value and decreases towards 1 as the time increases.
-        # For this we can use a sigmoid function.
-        # f(x) = A + (1 - A) / (1 + exp(-k * (t - t_0))), where A is the scaling factor at t=0, t_0 is the time at which the scaling factor is (A-1)/2, and k is a constant determining the steepness of the sigmoid (4 looks good).
-
         # 1) Convert the angle to the range [-pi, pi] with 0 being the vertical position
         angle = self.state[4] - np.pi/2 # make 0 the vertical position
         # Convert angle to range -pi to pi
         if angle > np.pi:
             angle -= 2*np.pi
-        
+        x = self.state[0] # x position of the base
+        angular_vel = self.state[5] # Angular velocity
+
+        # State vector [x_pos, y_pos, x_vel, y_vel, angle, ang_vel]
         # 2) Calculate the reward for the angle
         R_max = 1
         k = 1
         angle_reward = R_max * np.exp(-k * np.abs(angle)) * np.sin((np.pi - np.abs(angle)) / 2)
 
+        
+
         # 3) Calculate the scaling for the x position
-        S_max = 1.5
-        S_min = 0.75
-        x = self.state[0] # x position of the base
+        S_max = 1.2
+        S_min = 0.2
+
         x_pos_scaling = (S_max - S_min) * np.exp(-k * np.abs(x)) * np.sin(np.pi/2 - np.pi/(2*self.x_lim) * np.abs(x)) + S_min
 
         # 4) Calculate the scaling for the time
@@ -154,14 +154,21 @@ class Pendulum:
         # This scaling is 1 at 0 angular velocity and decreases exponentially towards 0 as the angular velocity increases.
         angular_vel_scaling = np.exp(-np.abs(self.state[5])/5)
 
+        R_goal = 1 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
+
         # 5) Calculate the total reward
-        return angle_reward * x_pos_scaling * angular_vel_scaling #* time_scaling
+        return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal
 
 
-        # sin_angle = np.sin(self.state[4])
-        
-        # return 1 + sin_angle
-        # return 1 if np.abs(angle) < np.pi/6 else 0
+        # R_theta = -1/np.pi**2 * angle**2 # Penalty for being far from the top
+        # R_x = -2/self.x_lim**2 * x**2 # Penalty for being far from the center
+        # R_goal = 2 if np.abs(angle) < 0.25 else 0 # Reward for being close to the top
+        # R_up = 1 if np.abs(angle) < np.pi/2 else 0 # Reward for being upright
+        # R_time = 0.3 # Reward for not ending the episode early
+
+        # R_vel = -1/100 * angular_vel**2 # Penalty for high angular velocity
+
+        # return R_theta + R_x + R_goal + R_time + R_vel + R_up
 
     def step(self, force):
         """
@@ -172,7 +179,7 @@ class Pendulum:
         """
 
         if self.logging:
-            self.episode_log.append((self.state.copy(), force)) # Log the state-action pair
+            self.episode_log.append((self.state.copy(), force[0], self.reward())) # Log the state-action pair
 
         self.update(force)
         reward = self.reward()
@@ -217,7 +224,7 @@ class Pendulum:
         screen = pg.display.set_mode(screen_dim)
 
         agent.eps = 0.0
-        agent.noise_std = 0.0
+        agent.enable_noise = False
 
         running = True
         while running:

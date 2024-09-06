@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import tensorflow as tf
+import keras
 from keras.models import Sequential, load_model, Model
 from keras.layers import Dense, Concatenate, Input
 from keras.optimizers import Adam
@@ -242,25 +243,28 @@ class DDPGAgent:
 
         self.force_magnitude = config.force_magnitude
 
-        self.actor_model, self.critic_model = self.build_model(config=config.DDPG)
+        self.actor_model, self.critic_model = self.build_models(config=config.DDPG)
+        self.target_actor_model, self.target_critic_model = self.build_models(config=config.DDPG)
         if config.IO_parameters.init_from_weights.enable:
             self.load_weights(config.IO_parameters.init_from_weights.file_path)
-
-        self.target_actor_model, self.target_critic_model = self.build_model(config=config.DDPG)
-        self.target_actor_model.set_weights(self.actor_model.get_weights())
-        self.target_critic_model.set_weights(self.critic_model.get_weights())
+        else:
+            self.target_actor_model.set_weights(self.actor_model.get_weights())
+            self.target_critic_model.set_weights(self.critic_model.get_weights())
 
         # Initialize noise for exploration
         self.enable_noise = config.DDPG.actor.ornstein_uhlenbeck_noise.enable
         self.noise = OrnsteinUhlenbeckNoise(mu=np.zeros(1), sigma=config.DDPG.actor.ornstein_uhlenbeck_noise.sigma, theta=config.DDPG.actor.ornstein_uhlenbeck_noise.theta, dt=0.05)
 
-    def build_model(self, config : DDPGParams):
+    def build_models(self, config : DDPGParams):
         # Build the actor network
         state_input = Input(shape=self.state_shape)
         h = Dense(config.actor.hidden_layer_sizes[0], activation='relu')(state_input)
         for layer_size in config.actor.hidden_layer_sizes[1:]:
             h = Dense(layer_size, activation='relu')(h)
-        output = Dense(self.action_size, activation='tanh')(h)
+
+        # Initialise weights between -3e-3 and 3e-3 to avoid vanishing gradients due to tanh activation
+        output_init = keras.initializers.RandomUniform(minval=-0.003, maxval=0.003)
+        output = Dense(self.action_size, activation='tanh', kernel_initializer=output_init)(h)
 
         actor_model = Model(inputs=state_input, outputs=output)
         actor_model.compile(optimizer=Adam(config.actor.learning_rate))
@@ -303,9 +307,10 @@ class DDPGAgent:
 
     def act(self, state):
         action = self.actor_model.predict(state, verbose=0)
-
+        
         if self.enable_noise:
             noise = self.noise()
+            # print(f"action: {action}, noise: {noise}")
             action = action + noise # Add noise for exploration
         
         action = np.clip(action, -1, 1)
@@ -313,7 +318,7 @@ class DDPGAgent:
         force = action.squeeze()*self.force_magnitude # Convert action to force value
         return np.array([force, 0]), action
 
-    def replay(self):
+    def update(self):
         if len(self.memory) < self.batch_size:
             return
         print("Running replay...")
@@ -382,25 +387,28 @@ class DDPGAgent:
         for e in range(num_episodes):
             state = env.reset()
             state = self.get_state_representation(state)
-            R = 0
+            episode_reward = 0
             time_step = 0
             done = False
+
             while not done:
                 force, action = self.act(state)
                 next_state, reward, done = env.step(force)
                 next_state = self.get_state_representation(next_state)
-                R += reward
+                episode_reward += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}")
+                    print(f"episode: {e}/{num_episodes}, score: {episode_reward}, steps: {time_step}, sigma: {self.noise.sigma:.2}")
                     break
-                self.replay()
+                self.update()
                 state = next_state
                 time_step += 1
+
             if config.model.IO_parameters.save_weights.enable:
                 if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
                     self.save(config.model.IO_parameters.save_weights.file_path)
-        
+
+            self.noise.sigma *= config.model.DDPG.actor.ornstein_uhlenbeck_noise.sigma_decay
 
     def update_target(self, target_model, model, polyak):
         # Get the weights of both models
@@ -421,11 +429,17 @@ class DDPGAgent:
         base, extension = os.path.splitext(filepath)
         self.actor_model.load_weights(base + '_actor' + extension)
         self.critic_model.load_weights(base + '_critic' + extension)
+
+        self.target_actor_model.load_weights(base + '_target_actor' + extension)
+        self.target_critic_model.load_weights(base + '_target_critic' + extension)
     
     def save(self, filepath):
         base, extension = os.path.splitext(filepath)
         self.actor_model.save(base + '_actor' + extension)
         self.critic_model.save(base + '_critic' + extension)
+
+        self.target_actor_model.save(base + '_target_actor' + extension)
+        self.target_critic_model.save(base + '_target_critic' + extension)
 
 
 class OrnsteinUhlenbeckNoise:
