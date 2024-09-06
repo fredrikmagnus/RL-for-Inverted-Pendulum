@@ -15,15 +15,15 @@ The environment is a simple simulation of an inverted pendulum. The pendulum is 
 
 
 
-Given these assumptions, the state of the pendulum can be described by four variables: 
-$
-s_t = [x, \dot{x}, \theta, \dot{\theta}]
-$
+Given these assumptions, the state of the pendulum can be described by four variables:
+
+$s_t = [x, \dot{x}, \theta, \dot{\theta}]$
+
 Here, $x$ is the position of the base along the $x$-axis, $\dot{x}$ is the velocity of the base, $\theta$ is the angle of the pendulum from the $x$-axis, and $\dot{\theta}$ is the angular velocity of the pendulum. To balance the pendulum, the agent can apply a force $F_t$ to the base. 
 The dynamics of the pendulum is described by the time derivatives of the state variables, which is resolved through Newton's laws of motion. The state derivative can be written as: 
-$
-\frac{d}{dt} s = \begin{bmatrix} \dot{x} \\ \ddot{x} \\ \dot{\theta} \\ \ddot{\theta} \end{bmatrix}
-$
+
+$\frac{d}{dt} s = \begin{bmatrix} \dot{x} \\ \ddot{x} \\ \dot{\theta} \\ \ddot{\theta} \end{bmatrix}$
+
 While the velocity, $\dot{x}$, and the angular velocity, $\dot{\theta}$, is known, the acceleration, $\ddot{x}$ and $\ddot{\theta}$, must be derived. The acceleration of the base is given by the force applied to it, $\vec{F}$, divided by the mass of the base:
 $
 \ddot{x} = \frac{\vec{F}}{m_{\text{base}}}
