@@ -8,11 +8,16 @@ This is a simple implementation of the inverted pendulum problem using various r
 
 The environment is a simple simulation of an inverted pendulum. The pendulum is attached to a base and can rotate about a pivot point. The goal is to balance the pendulum in the upright position by applying a force to the base. 
 
+<div style="float: right; margin: 0 0 10px 10px; text-align: center;">
+  <img src="./figures/PendulumFig.svg" alt="Pendulum Diagram" width="300"/>
+  <div><em>Figure 1: Pendulum Diagram</em></div>
+</div>
+
 <a name="fig-pendulum"></a>
 ![Pendulum Diagram](./figures/PendulumFig.svg)
 *Figure 1: Pendulum Diagram*
 
-As shown in [Figure 1](#fig-pendulum), the pendulum swings...
+
 
 
 | ![Pendulum Diagram](./figures/PendulumFig.svg) |
