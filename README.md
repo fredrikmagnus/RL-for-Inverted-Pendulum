@@ -18,3 +18,16 @@ As shown in [Figure 1](#fig-pendulum), the pendulum swings...
 | ![Pendulum Diagram](./figures/PendulumFig.svg) |
 |:--:|
 | *Figure 1: Pendulum Diagram* |
+
+<table style="border: none;">
+  <tr>
+    <td style="text-align: center;">
+      <img src="./figures/PendulumFig.svg" alt="Pendulum Diagram" />
+    </td>
+  </tr>
+  <tr>
+    <td style="text-align: center;">
+      <em>Figure 1: Pendulum Diagram</em>
+    </td>
+  </tr>
+</table>
