@@ -71,11 +71,12 @@ class Pendulum:
         angle = state[4] # Angle
         ang_vel = state[5] # Angular velocity
         u = np.array([np.cos(angle), np.sin(angle)]) # Unit vector in the direction of the pendulum
-        fb = np.dot(force, u)*u + np.array([0, -self.g]) # Force acting on the bob
+        fb = np.dot(force, u)*u + np.array([0, -self.mass_bob*self.g]) # Force acting on the bob
         base_acc = (force)/self.mass_base # Acceleration of the base (independent of the bob)
-        ang_acc = np.cross(force-fb, self.length*u)/(self.mass_bob*self.length**2) # Angular acceleration of the bob
+        ang_acc = np.cross(force-fb, self.length*u)/(self.mass_bob*self.length**2) - self.config.damping_coefficient*ang_vel # Angular acceleration of the bob
         state_dot = np.array([vel[0], vel[1], base_acc[0], base_acc[1], ang_vel, ang_acc]) # Derivative of the state vector
         return state_dot
+
         
     def update(self, force):
         """
@@ -109,7 +110,7 @@ class Pendulum:
 
         return self.state
     
-    def reward(self):
+    def reward(self, force=None):
 
         # Reward function:
         # First we have a reward for increasing the height of the bob. 
@@ -156,8 +157,10 @@ class Pendulum:
 
         R_goal = 1 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
 
+        Penalty_force = 0 if force is None else -0.05 * np.linalg.norm(force) # Penalty for using force
+        
         # 5) Calculate the total reward
-        return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal
+        return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal + Penalty_force
 
 
         # R_theta = -1/np.pi**2 * angle**2 # Penalty for being far from the top
@@ -246,6 +249,7 @@ class Pendulum:
             pg.draw.line(screen, (0,0,0), p_base, p_end , 2)
 
             self.update(force)
+            # self.update(np.array([0, 0])) # No force acting on the base (for debugging)
 
             pg.display.flip() # update screen?
             fpsClock.tick(1/dt)

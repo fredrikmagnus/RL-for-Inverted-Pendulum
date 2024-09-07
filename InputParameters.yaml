@@ -12,25 +12,26 @@ pendulum:
   mass_bob: 1.0 # Mass of the bob
   mass_base: 1.0 # Mass of the base
   length: 0.5 # Length of the pendulum
+  damping_coefficient: 0.1 # Damping coefficient for the pendulum
   gravity: 9.81 # Acceleration due to gravity
 
   termination:
     angle_limit: null # Angle limit for the pendulum (in degrees). Set to 'null' for no limit.
     x_limit: 3 # x limit for the pendulum (in meters). Set to None for no limit.
-    time_limit: 5 # Time limit for the episode (in seconds). Must be greater than 0.
+    time_limit: 7 # Time limit for the episode (in seconds). Must be greater than 0.
     termination_penalty: -5 # Penalty for terminating the episode early.
 
   logging: 
     enable: True # Enable logging
     overwrite: False # Overwrite existing log file or append to it
-    file_path: "logs/DDPG_25F_try2.csv" # File path to save log to
+    file_path: "logs/DDPG_25F_try3.csv" # File path to save log to
 
 model:
   type: DDPG # DQN, REINFORCE or DDPG
   memory_size: 512 # Size of the replay memory buffer
   batch_size: 16 # Mini-batch size for training
   discount_factor: 0.99 # Discount factor for future rewards
-  force_magnitude: 25 # Magnitude of the force applied to the pendulum (max force for DDPG)
+  force_magnitude: 35 # Magnitude of the force applied to the pendulum (max force for DDPG)
 
 
   IO_parameters: # Input and output parameters for the model
@@ -63,7 +64,7 @@ model:
       ornstein_uhlenbeck_noise:
         enable: True # Enable addition of noise to action for exploration
         theta: 1 # Theta parameter for the Ornstein-Uhlenbeck noise process
-        sigma: 0.22 # Sigma parameter for the Ornstein-Uhlenbeck noise process
+        sigma: 0.2 # Sigma parameter for the Ornstein-Uhlenbeck noise process
         sigma_decay: 0.999 # Sigma decay rate (per episode)
 
     critic:

@@ -21,6 +21,7 @@ class PendulumParams(BaseModel):
     mass_bob: float = Field(1.0, description="Mass of the bob.")
     mass_base: float = Field(1.0, description="Mass of the base.")
     length: float = Field(1.0, description="Length of the pendulum.")
+    damping_coefficient: float = Field(0.1, description="Damping coefficient for the pendulum.")
     gravity: float = Field(9.81, description="Acceleration due to gravity.")
     termination: TerminationParams = TerminationParams()
     logging: LoggingParams = LoggingParams()

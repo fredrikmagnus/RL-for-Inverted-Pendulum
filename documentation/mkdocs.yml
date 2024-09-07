@@ -1,0 +1,17 @@
+site_name: "Reinforcement Learning for the Inverted Pendulum Problem"
+
+theme:
+  name: material
+  features:
+    - content.code.annotate # Enable code annotation
+nav:
+  - Home: index.md
+  - Algorithms: main.md
+  # - Results: results.md
+
+markdown_extensions:
+  - pymdownx.arithmatex
+
+extra_javascript:
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
