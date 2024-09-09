@@ -11,7 +11,6 @@ class TerminationParams(BaseModel):
 
 class LoggingParams(BaseModel):
     enable: bool = Field(True, description="Enable logging.")
-    overwrite: bool = Field(False, description="Overwrite existing log file or append to it.")
     file_path: str = Field("logs/DDPG.log", description="File path to save log to.")
 
 class PendulumParams(BaseModel):
@@ -57,7 +56,8 @@ class NoiseParams(BaseModel):
     enable: bool = Field(True, description="Enable addition of noise to action for exploration.")
     theta: float = Field(0.15, description="Theta parameter for the Ornstein-Uhlenbeck noise process.")
     sigma: float = Field(0.2, description="Sigma parameter for the Ornstein-Uhlenbeck noise process.")
-    sigma_decay: float = Field(1, description="Decay rate for sigma parameter.")
+    noise_scale_initial: float = Field(1, description="Initial scale for noise.")
+    noise_decay: float = Field(1, description="Decay rate for noise scale parameter.")
 
 class DDPGActorParams(BaseModel):
     hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
@@ -94,8 +94,20 @@ class RunParams(BaseModel):
     num_episodes: int = Field(512, description="Number of episodes to run.")
     batch_size: int = Field(16, description="Mini-batch size for training.")
 
+class AnimateFromLogParams(BaseModel):
+    enable: bool = Field(False, description="Enable animation from file, else run simulation and animate.")
+    episode: int = Field(0, description="Log index of episode to plot.")
+    file_path: str = Field("", description="File path to load log from.")
+
+class AnimateParams(BaseModel):
+    x_lim: float = Field(2, description="x limit for the animation (in meters).")
+    y_lim: float = Field(2, description="y limit for the animation (in meters).")
+    save_path: Optional[str] = Field(None, description="Path to save the animation. None for no save.")
+    from_log: AnimateFromLogParams = AnimateFromLogParams()
+
 class Config(BaseModel):
     run: RunParams = RunParams()
+    animate: AnimateParams = AnimateParams()
     pendulum: PendulumParams = PendulumParams()
     model: ModelParams = ModelParams()
 

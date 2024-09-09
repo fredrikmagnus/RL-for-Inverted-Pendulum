@@ -21,10 +21,11 @@ class Pendulum:
         self.g = config.gravity # Acceleration due to gravity (m/s^2)
         self.time = 0 # Current time in the episode
 
+        self.prev_force = 0 # Previous force applied to the base
+
         # Logging 
         self.episode_log = [] # Log of the episode. It will contain pairs of (state, force) for each time step in the episode.
         self.logging = config.logging.enable # Enable logging
-        self.log_overwrite = config.logging.overwrite # Overwrite existing log file or append to it
         self.log_file_path = config.logging.file_path
 
     def write_log_to_file(self):
@@ -133,31 +134,28 @@ class Pendulum:
         # State vector [x_pos, y_pos, x_vel, y_vel, angle, ang_vel]
         # 2) Calculate the reward for the angle
         R_max = 1
-        k = 1
-        angle_reward = R_max * np.exp(-k * np.abs(angle)) * np.sin((np.pi - np.abs(angle)) / 2)
+        n = 1.5
+        # k = 0.5
+        # angle_reward = R_max * np.exp(-k * np.abs(angle)) * np.sin((np.pi - np.abs(angle)) / 2)
+        angle_reward = R_max * (1 - (np.abs(angle) / np.pi) ** n) # Reward for being upright
 
         
 
         # 3) Calculate the scaling for the x position
-        S_max = 1.2
+        S_max = 1
         S_min = 0.2
-
+        k = 1
         x_pos_scaling = (S_max - S_min) * np.exp(-k * np.abs(x)) * np.sin(np.pi/2 - np.pi/(2*self.x_lim) * np.abs(x)) + S_min
 
-        # 4) Calculate the scaling for the time
-        # A = 1.5
-        # t_0 = 2
-        # k = 4
-        # time_scaling = A + (1 - A) / (1 + np.exp(-k * (self.time - t_0))) # Time is not an input, so on second thought this might be detrimental
 
-        # 5) Penalize high angular velocity.
+        # 4) Penalize high angular velocity.
         # We add a penalty for high angular velocity using a scaling of the reward based on the angular velocity.
         # This scaling is 1 at 0 angular velocity and decreases exponentially towards 0 as the angular velocity increases.
         angular_vel_scaling = np.exp(-np.abs(self.state[5])/5)
 
-        R_goal = 1 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
+        R_goal = 0.25 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
 
-        Penalty_force = 0 if force is None else -0.05 * np.linalg.norm(force) # Penalty for using force
+        Penalty_force = 0 if force is None else -0.01 * np.linalg.norm(force) # Penalty for using force
         
         # 5) Calculate the total reward
         return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal + Penalty_force

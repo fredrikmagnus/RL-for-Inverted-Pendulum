@@ -123,7 +123,7 @@ class DQNAgent:
 class REINFORCEAgent:
     def __init__(self, config : ModelParams) -> None:
         self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
-        self.action_size = 2 # Number of actions (force left or right)
+        self.action_size = 3 # Number of actions (force left or right)
         self.hidden_layer_sizes = config.REINFORCE.hidden_layer_sizes # List specifying the number of neurons in each layer
         self.learning_rate = config.REINFORCE.learning_rate # Learning rate for the optimizer
         self.memory = deque(maxlen = config.memory_size) # Used to store transitions to learn from.
@@ -159,6 +159,7 @@ class REINFORCEAgent:
         act_probs = self.model.predict(state, verbose=0)[0] # Get action probabilities
         action = np.random.choice(np.arange(len(act_probs)), p=act_probs) # Sample action from action probabilities
         force = -self.force_magnitude if action == 0 else self.force_magnitude # Convert action to force value
+        force = 0 if action == 2 else force # Do nothing if action is 2
         return np.array([force, 0]), action # Return force vector and action taken
     
     def replay(self, batch_size):
@@ -253,6 +254,7 @@ class DDPGAgent:
 
         # Initialize noise for exploration
         self.enable_noise = config.DDPG.actor.ornstein_uhlenbeck_noise.enable
+        self.noise_scaling = config.DDPG.actor.ornstein_uhlenbeck_noise.noise_scale_initial
         self.noise = OrnsteinUhlenbeckNoise(mu=np.zeros(1), sigma=config.DDPG.actor.ornstein_uhlenbeck_noise.sigma, theta=config.DDPG.actor.ornstein_uhlenbeck_noise.theta, dt=0.05)
 
     def build_models(self, config : DDPGParams):
@@ -309,8 +311,7 @@ class DDPGAgent:
         action = self.actor_model.predict(state, verbose=0)
         
         if self.enable_noise:
-            noise = self.noise()
-            # print(f"action: {action}, noise: {noise}")
+            noise = self.noise_scaling*self.noise()
             action = action + noise # Add noise for exploration
         
         action = np.clip(action, -1, 1)
@@ -398,7 +399,7 @@ class DDPGAgent:
                 episode_reward += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {episode_reward}, steps: {time_step}, sigma: {self.noise.sigma:.2}")
+                    print(f"episode: {e}/{num_episodes}, score: {episode_reward}, steps: {time_step}, noise: {self.noise_scaling:.2}")
                     break
                 self.update()
                 state = next_state
@@ -408,7 +409,7 @@ class DDPGAgent:
                 if e%config.model.IO_parameters.save_weights.save_frequency == 0 and e != 0:
                     self.save(config.model.IO_parameters.save_weights.file_path)
 
-            self.noise.sigma *= config.model.DDPG.actor.ornstein_uhlenbeck_noise.sigma_decay
+            self.noise_scaling *= config.model.DDPG.actor.ornstein_uhlenbeck_noise.noise_decay
 
     def update_target(self, target_model, model, polyak):
         # Get the weights of both models

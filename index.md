@@ -1,0 +1,3 @@
+# Reinforcement Learning for the Inverted Pendulum Problem
+
+This is a simple implementation of the inverted pendulum problem using various reinforcement learning techniques. The problem is to balance an inverted pendulum by applying a force to the base of the pendulum. This is a classical control problem and serves as a good example for exploring reinforcement learning algorithms. This project concerns the modelling of the pendulum environment and the implementation of three common reinforcement learning algorithms. The first we will consider is a basic Q-Learning approach. We then move on to REINFORCE, a Policy Gradient method, and finally the Deep Deterministic Policy Gradient (DDPG) algorithm.
