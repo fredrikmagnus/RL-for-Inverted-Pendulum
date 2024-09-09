@@ -25,7 +25,6 @@ elif model_params.type == 'DDPG':
 if run_params.type == 'train':
     agent.train(env, config)
 elif run_params.type == 'test':
-    # env.animate(agent)
     if animate_params.from_log.enable:
         episode_data = read_ep_from_log(animate_params.from_log.file_path, animate_params.from_log.episode)
         animate_episode(episode_data, config)

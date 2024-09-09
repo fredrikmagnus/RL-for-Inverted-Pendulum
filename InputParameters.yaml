@@ -1,16 +1,16 @@
 run:
-  type: test # train or test
+  type: train # train or test
   num_episodes: 5000 # Number of episodes to run
 
 animate:
   x_lim: 2 # x limit for the animation (in meters)
   y_lim: 2 # y limit for the animation (in meters)
-  save_path: null #"figures/animation.gif" # File path to save animation to. null for no save
+  save_path: "figures/animation.gif" # File path to save animation to. null for no save
 
   from_log:
-    enable: True # Enable animation from file, else run simulation and animate
-    episode: -1 # Log index of episode to plot
-    file_path: "logs/DDPG_try4_1m2xlim.csv" # File path to load log from
+    enable: False # Enable animation from file, else run simulation and animate
+    episode: -1 # Log index of episode to animate. -1 for last episode
+    file_path: "logs/DDPG_try5.csv" # File path to load log from
   
 pendulum:
   deterministic_initial_state: False # Use a deterministic initial state or add gaussian noise
@@ -30,7 +30,7 @@ pendulum:
 
   logging: 
     enable: True # Enable logging
-    file_path: "logs/DDPG_try4_1m2xlim.csv" # File path to save log to
+    file_path: "logs/DDPG_try5.csv" # File path to save log to
 
 model:
   type: DDPG # DQN, REINFORCE or DDPG
@@ -42,10 +42,10 @@ model:
   IO_parameters: # Input and output parameters for the model
     init_from_weights: 
       enable: True # Initialize model from weights
-      file_path: "weights/DDPG_25F_1m2xlim_4.keras" # File path to load weights from
+      file_path: "weights/DDPG_25F_try6.keras" # File path to load weights from
     save_weights:
       enable: True # Save weights to file
-      file_path: "weights/DDPG_25F_1m2xlim_4.keras" # File path to save weights to
+      file_path: "weights/DDPG_25F_try7.keras" # File path to save weights to
       save_frequency: 1 # Save weights every n episodes
 
   DQN:
@@ -63,22 +63,22 @@ model:
   DDPG:
     actor:
       hidden_layer_sizes: [256, 256] # Number of neurons in each layer
-      learning_rate: 0.001 # Learning rate for the optimizer
-      polyak: 0.995 # Polyak averaging parameter for target network updates
+      learning_rate: 0.0005 # Learning rate for the optimizer
+      polyak: 0.99 # Polyak averaging parameter for target network updates
       
       ornstein_uhlenbeck_noise:
-        enable: True # Enable addition of noise to action for exploration
+        enable: False # Enable addition of noise to action for exploration
         theta: 1 # Theta parameter for the Ornstein-Uhlenbeck noise process
         sigma: 0.2 # Sigma parameter for the Ornstein-Uhlenbeck noise process
         noise_scale_initial: 1 # Initial noise scale
-        noise_decay: 0.99 # Noise decay rate (per episode)
+        noise_decay: 0.9995 # Noise decay rate (per episode)
 
     critic:
       state_input_layer_sizes: [16, 32] # Number of neurons in each of the layers processing the state input
       action_input_layer_sizes: [32] # Number of neurons in each of the layers processing the action input
       combined_layer_sizes: [256, 256] # Number of neurons in each layer for combined state and action input
-      learning_rate: 0.002 # Learning rate for the optimizer
-      polyak: 0.995 # Polyak averaging parameter for target network updates
+      learning_rate: 0.001 # Learning rate for the optimizer
+      polyak: 0.99 # Polyak averaging parameter for target network updates
 
 
 

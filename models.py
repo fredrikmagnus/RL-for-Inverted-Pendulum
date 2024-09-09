@@ -265,7 +265,7 @@ class DDPGAgent:
             h = Dense(layer_size, activation='relu')(h)
 
         # Initialise weights between -3e-3 and 3e-3 to avoid vanishing gradients due to tanh activation
-        output_init = keras.initializers.RandomUniform(minval=-0.003, maxval=0.003)
+        output_init = keras.initializers.RandomUniform(minval=-0.001, maxval=0.001)
         output = Dense(self.action_size, activation='tanh', kernel_initializer=output_init)(h)
 
         actor_model = Model(inputs=state_input, outputs=output)

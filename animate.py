@@ -16,6 +16,8 @@ def run_episode(env, agent):
     - env (Pendulum): The Pendulum environment object.
     - agent (DDPGAgent, DQNAgent, REINFORCEAgent): The agent object to act in the environment.
     """
+    print("Running episode...")
+    
     # Disable noise and exploration for testing
     agent.enable_noise = False
     agent.eps = 0.
@@ -76,6 +78,8 @@ def animate_episode(state_history, config: Config):
     Args:
     - state_history (np.ndarray): Array containing the state history for the episode.
     """
+    print("Animating episode...")
+
     r = config.pendulum.length  # Length of the pendulum
     x_lim = config.animate.x_lim  # Limit for x-axis
     y_lim = config.animate.y_lim  # Limit for y-axis
