@@ -7,9 +7,15 @@ This project regards the implementation of various reinforcement learning (RL) a
 
 
  The algorithms implemented in this project are: 
-- DQN (Deep Q-Network): This method aims to approximate the state-action value function, $Q(s,a)$.
-- REINFORCE (Monte Carlo Policy Gradient): This method aims to directly approximate the policy function, $\pi(a|s)$; a probability distribution over actions given a state.
+- DQN (Deep Q-Network): This method aims to approximate the state-action value function, $Q(s,a)$, using a neural network.
+- REINFORCE (Monte Carlo Policy Gradient): This method directly learns the policy, $\pi(a|s)$ -- a probability distribution over the possible actions given a state.
 - DDPG (Deep Deterministic Policy Gradient): This is an actor-critic method that learns both a state-value function, $Q(s,a)$ (the critic), and a deterministic policy, $\mu(s)$ (the actor).
 
-![Pendulum Figure](./figures/animation.gif)
+
+| ![Figure 1](./figures/animation_DDPG_up_good.gif) | ![Figure 2](./figures/animation_DQN_up_good.gif) | ![Figure 3](./figures/animation_REINFORCE_up_good3.gif) |
+|:---:|:---:|:---:|
+| DDPG | DQN | REINFORCE |
+
+
+![Pendulum Figure](./figures/animation_DDPG_swingUp.gif)
 

@@ -15,7 +15,7 @@ class LoggingParams(BaseModel):
 
 class PendulumParams(BaseModel):
     deterministic_initial_state: bool = Field(False, description="Use a deterministic initial state or add noise.")
-    initial_state: Literal['up', 'down'] = Field('up', description="Initial state of the pendulum (up or down).")
+    initial_state: Literal['up', 'down', 'random'] = Field('up', description="Initial state of the pendulum (up, down or random).")
     time_step: float = Field(0.025, description="Time step for the simulation.")
     mass_bob: float = Field(1.0, description="Mass of the bob.")
     mass_base: float = Field(1.0, description="Mass of the base.")
@@ -46,11 +46,14 @@ class EpsilonParams(BaseModel):
 class DQNParams(BaseModel):
     hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
     learning_rate: float = Field(1e-3, description="Learning rate for the optimizer.")
+    num_actions: int = Field(2, description="Number of actions in the action space. (2 for left and right, 3 for left, right and no action)")
+    polyak: float = Field(0.95, description="Polyak averaging parameter for target network updates.")
     epsilon: EpsilonParams = EpsilonParams()
 
 class REINFORCEParams(BaseModel):
     hidden_layer_sizes: List[int] = Field([16, 16], description="Number of neurons in each layer.")
     learning_rate: float = Field(1e-3, description="Learning rate for the optimizer.")
+    num_actions: int = Field(2, description="Number of actions in the action space. (2 for left and right, 3 for left, right and no action)")
     
 class NoiseParams(BaseModel):
     enable: bool = Field(True, description="Enable addition of noise to action for exploration.")

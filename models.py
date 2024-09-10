@@ -14,7 +14,7 @@ from pendulum import Pendulum
 class DQNAgent:
     def __init__(self, config : ModelParams) -> None:
         self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
-        self.action_size = 2 # Number of actions (force left or right)
+        self.action_size = config.DQN.num_actions # Number of actions (2 for left and right, 3 for left, right and no action)
 
         self.memory = deque(maxlen = config.memory_size) # Circular buffer used to store transitions to learn from.
         self.gamma = config.discount_factor # Discount rate
@@ -22,9 +22,15 @@ class DQNAgent:
         self.epsilon_min = config.DQN.epsilon.epsilon_min # Minimum epsilon value
         self.epsilon_decay = config.DQN.epsilon.epsilon_decay # Epsilon decay rate
         self.force_magnitude = config.force_magnitude # Magnitude of the force applied to the base
+
+        self.polyak = config.DQN.polyak # Polyak averaging parameter for target network updates
         self.model = self.build_model(config.DQN)
+        self.target_model = self.build_model(config.DQN)
         if config.IO_parameters.init_from_weights.enable:
             self.load_weights(config.IO_parameters.init_from_weights.file_path)
+        else:
+            self.target_model.set_weights(self.model.get_weights())
+
 
     def build_model(self, config : DQNParams):
         model = Sequential()
@@ -47,10 +53,13 @@ class DQNAgent:
             action = np.argmax(action_values[0]) # Greedy action (0:left or 1:right)
         
         force = -self.force_magnitude if action == 0 else self.force_magnitude # Convert action to force value 
+        if self.action_size == 3:
+            force = 0 if action == 2 else force
+
         return np.array([force, 0]), action # Return force vector and action taken
         
     
-    def replay(self, batch_size):
+    def update(self, batch_size):
         minibatch = random.sample(self.memory, batch_size)
         print("Running replay...")
 
@@ -61,7 +70,7 @@ class DQNAgent:
         for i, (state, action, reward, next_state, done) in enumerate(minibatch):
             target = reward
             if not done:
-                target = reward + self.gamma * np.max(self.model.predict(next_state, verbose=0)[0])  # Bellman equation
+                target = reward + self.gamma * np.max(self.target_model.predict(next_state, verbose=0)[0])
 
             # Model prediction of future return
             target_f = self.model.predict(state, verbose=0)
@@ -76,6 +85,8 @@ class DQNAgent:
 
         if self.eps_init > self.epsilon_min:
             self.eps_init *= self.epsilon_decay
+        
+        self.update_target(self.target_model, self.model, self.polyak)
 
     def get_state_representation(self, state):
         state = state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
@@ -104,7 +115,7 @@ class DQNAgent:
                     print(f"episode: {e}/{num_episodes}, score: {time_step}, eps: {self.eps_init:.2}")
                     break
                 if len(self.memory) > batch_size: # Train agent
-                    self.replay(batch_size)
+                    self.update(batch_size)
                 state = next_state
                 time_step += 1
             if config.model.IO_parameters.save_weights.enable:
@@ -112,18 +123,37 @@ class DQNAgent:
                     self.save(config.model.IO_parameters.save_weights.file_path)
 
 
+    def update_target(self, target_model, model, polyak):
+        # Get the weights of both models
+        target_weights = target_model.get_weights()
+        weights = model.get_weights()
+        
+        # Update target network weights
+        new_weights = []
+        for target_weight, weight in zip(target_weights, weights):
+            # Perform the soft update
+            updated_weight = polyak * target_weight + (1 - polyak) * weight
+            new_weights.append(updated_weight)
+        
+        # Set the new weights to the target model
+        target_model.set_weights(new_weights)
+
     def load_weights(self, filepath):
-        self.model = load_model(filepath)
+        base, extension = os.path.splitext(filepath)
+        self.model.load_weights(filepath)
+        self.target_model.load_weights(base + '_target' + extension)
     
     def save(self, filepath):
+        base, extension = os.path.splitext(filepath)
         self.model.save(filepath)
+        self.target_model.save(base + '_target' + extension)
 
 
 
 class REINFORCEAgent:
     def __init__(self, config : ModelParams) -> None:
         self.state_shape = (5,) # State shape (x_pos, x_vel, sin(angle), cos(angle), angle_vel)
-        self.action_size = 3 # Number of actions (force left or right)
+        self.action_size = config.REINFORCE.num_actions # Number of actions (2 for left and right, 3 for left, right and no action)
         self.hidden_layer_sizes = config.REINFORCE.hidden_layer_sizes # List specifying the number of neurons in each layer
         self.learning_rate = config.REINFORCE.learning_rate # Learning rate for the optimizer
         self.memory = deque(maxlen = config.memory_size) # Used to store transitions to learn from.
@@ -132,6 +162,8 @@ class REINFORCEAgent:
         self.model = self.build_model()
         if config.IO_parameters.init_from_weights.enable:
             self.load_weights(config.IO_parameters.init_from_weights.file_path)
+
+        self.baseline = 0 # Baseline for the reward (running average of episodic reward)
 
     def custom_loss(self, y_true, y_pred):
         # We now redefine the loss-function to avoid having to store the rewards in a class.
@@ -159,7 +191,8 @@ class REINFORCEAgent:
         act_probs = self.model.predict(state, verbose=0)[0] # Get action probabilities
         action = np.random.choice(np.arange(len(act_probs)), p=act_probs) # Sample action from action probabilities
         force = -self.force_magnitude if action == 0 else self.force_magnitude # Convert action to force value
-        force = 0 if action == 2 else force # Do nothing if action is 2
+        if self.action_size == 3:
+            force = 0 if action == 2 else force # Do nothing if action is 2
         return np.array([force, 0]), action # Return force vector and action taken
     
     def replay(self, batch_size):
@@ -197,7 +230,7 @@ class REINFORCEAgent:
                 next_state = self.get_state_representation(next_state) # Get state representation
                 ep.append((state, action, reward)) # Add state, action, reward to episode history
                 if done:
-                    print(f"episode: {e}/{num_episodes}, score: {R}, steps: {time_step}")
+                    print(f"episode: {e}/{num_episodes}, score: {R}, advantage: {R-self.baseline}, steps: {time_step}")
                     break
                 state = next_state # Update state
                 time_step += 1 # Increment time step
@@ -208,7 +241,10 @@ class REINFORCEAgent:
             for i, r in enumerate(R[::-1]):
                 i = len(R)-i-1 # Reverse index
                 G = r+self.gamma*G # Discounted reward
-                ep[i] = (ep[i][0], ep[i][1], ep[i][2], G, i) # Replace reward with G and add time step
+                ep[i] = (ep[i][0], ep[i][1], ep[i][2], G-self.baseline, i) # Replace reward with G-baseline and add time step
+
+            # self.baseline += (G-self.baseline)/(e+1) # Update baseline with running average of episodic reward
+            # self.baseline = 0.9*self.baseline + 0.1*G # Update baseline with exponential moving average of episodic reward
 
             for state, action, reward, G, time_step in ep: # Add episode to memory
                 self.remember(state, action, reward, G, time_step)

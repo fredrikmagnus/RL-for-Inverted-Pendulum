@@ -102,6 +102,8 @@ class Pendulum:
         """
         deterministic = self.config.deterministic_initial_state
         down = self.config.initial_state=='down'
+        if self.config.initial_state == 'random':
+            down = random.choice([True, False])
 
         noise = np.zeros(6) if deterministic else np.random.normal(0, 0.1, 6) 
         init_angle = -np.pi/2 if down else np.pi/2
@@ -155,7 +157,7 @@ class Pendulum:
 
         R_goal = 0.25 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
 
-        Penalty_force = 0 if force is None else -0.01 * np.linalg.norm(force) # Penalty for using force
+        Penalty_force = 0 if force is None else -0.005 * np.linalg.norm(force) # Penalty for using force
         
         # 5) Calculate the total reward
         return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal + Penalty_force
@@ -183,7 +185,7 @@ class Pendulum:
             self.episode_log.append((self.state.copy(), force[0], self.reward())) # Log the state-action pair
 
         self.update(force)
-        reward = self.reward()
+        reward = self.reward(force)
         self.time += self.time_step
 
         # Check termination:
