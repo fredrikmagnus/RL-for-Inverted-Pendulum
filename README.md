@@ -1,21 +1,43 @@
-
-
 # Reinforcement Learning for the Inverted Pendulum Problem
-This project regards the implementation of various reinforcement learning (RL) algorithms in a custom environment. The environment is a simulation of a pendulum mounted to a cart which can move horisontally. The goal is to swing up and balance the pendulum in the upright position by applying appropriate forces to the cart. An illustration of the environment is shown below. The inverted pendulum problem is a classical control problem and serves as an excellent example for experimenting with reinforcement learning algorithms.
 
-![Pendulum Figure](./figures/PendulumFig.svg)
+This project explores the application of various reinforcement learning (RL) algorithms to the classic inverted pendulum problem. The inverted pendulum is a fundamental control challenge in dynamics and control theory, involving balancing a pendulum upright on a moving cart by applying appropriate horizontal forces. This setup serves as an excellent testbed for experimenting with RL algorithms in a practical setting.
 
+![Pendulum Illustration](./figures/PendulumFig.svg)
 
- The algorithms implemented in this project are: 
-- DQN (Deep Q-Network): This method aims to approximate the state-action value function, $Q(s,a)$, using a neural network.
-- REINFORCE (Monte Carlo Policy Gradient): This method directly learns the policy, $\pi(a|s)$ -- a probability distribution over the possible actions given a state.
-- DDPG (Deep Deterministic Policy Gradient): This is an actor-critic method that learns both a state-value function, $Q(s,a)$ (the critic), and a deterministic policy, $\mu(s)$ (the actor).
+## Overview
 
+The goal of this project is to swing up and balance the pendulum in the upright position by applying forces to the cart. A custom simulation environment was developed to model the physics of the pendulum and cart system accurately. Three different RL algorithms were implemented and evaluated:
 
-| ![Figure 1](./figures/animation_DDPG_up_good.gif) | ![Figure 2](./figures/animation_DQN_up_good.gif) | ![Figure 3](./figures/animation_REINFORCE_up_good3.gif) |
+- **Deep Q-Network (DQN)**: Approximates the state-action value function $ Q(s, a) $ using a neural network, enabling the agent to select actions that maximize expected rewards.
+- **REINFORCE (Monte Carlo Policy Gradient)**: Directly learns the policy $ \pi(a | s) $ by optimizing the expected return through gradient ascent, without explicitly modeling the value function.
+- **Deep Deterministic Policy Gradient (DDPG)**: An actor-critic method that concurrently learns a Q-function (critic) and a policy (actor) in a continuous action space, suitable for problems requiring fine control.
+
+## Implementation
+
+The project is structured into several components:
+
+1. **Simulation Environment**: A physics-based simulation of the inverted pendulum on a cart, allowing for customizable parameters like mass, length, friction, and gravity.
+2. **RL Algorithms**: Implementations of DQN, REINFORCE, and DDPG algorithms, each with tailored neural network architectures and learning procedures.
+3. **Visualization Tools**: Functions to animate and visualize the pendulum's behavior during training and testing, aiding in qualitative assessment.
+
+## Results
+
+### Balancing from Upright Position
+
+All three algorithms were tested on their ability to balance the pendulum starting from the upright position. The performance differences are evident in the animations below.
+
+| ![DDPG Balancing](./figures/animation_DDPG_up_good.gif) | ![DQN Balancing](./figures/animation_DQN_up_good.gif) | ![REINFORCE Balancing](./figures/animation_REINFORCE_up_good3.gif) |
 |:---:|:---:|:---:|
-| DDPG | DQN | REINFORCE |
+| **DDPG** | **DQN** | **REINFORCE** |
 
+- **DDPG**: Exhibited smooth and stable balancing due to its continuous action space, allowing for precise adjustments.
+- **DQN** and **REINFORCE**: Managed to balance the pendulum but with noticeable jitteriness. Their discrete action spaces limited control to fixed left or right forces, resulting in less fluid movements.
 
-![Pendulum Figure](./figures/animation_DDPG_swingUp.gif)
+### Swinging Up from Downward Position
 
+The algorithms were also evaluated on their ability to swing the pendulum up from the downward position and maintain balance.
+
+![DDPG Swing-Up](./figures/animation_DDPG_swingUp.gif)
+
+- **DDPG**: Successfully learned to swing up and balance the pendulum. The continuous action space was crucial for applying the nuanced forces required for this complex task.
+- **DQN** and **REINFORCE**: Were unable to achieve the swing-up due to the limitations inherent in their discrete action spaces.
