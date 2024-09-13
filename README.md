@@ -1,6 +1,6 @@
 # Reinforcement Learning for the Inverted Pendulum Problem
 
-This project explores the application of various reinforcement learning (RL) algorithms to the classic inverted pendulum problem. The inverted pendulum is a fundamental control challenge in dynamics and control theory, involving balancing a pendulum upright on a moving cart by applying appropriate horizontal forces. This setup serves as an excellent testbed for experimenting with RL algorithms in a practical setting.
+This project explores the application of various reinforcement learning (RL) algorithms to the classic inverted pendulum problem. The inverted pendulum is a common challenge in control theory, involving balancing a pendulum upright on a moving cart by applying appropriate horizontal forces. This setup serves as an excellent testbed for experimenting with RL algorithms in a practical setting.
 
 ![Pendulum Illustration](./figures/PendulumFig.svg)
 
