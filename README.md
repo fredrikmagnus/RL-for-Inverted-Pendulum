@@ -8,8 +8,8 @@ This project explores the application of various reinforcement learning (RL) alg
 
 The goal of this project is to swing up and balance the pendulum in the upright position by applying forces to the cart. A custom simulation environment was developed to model the physics of the pendulum and cart system accurately. Three different RL algorithms were implemented and evaluated:
 
-- **Deep Q-Network (DQN)**: Approximates the state-action value function $ Q(s, a) $ using a neural network, enabling the agent to select actions that maximize expected rewards.
-- **REINFORCE (Monte Carlo Policy Gradient)**: Directly learns the policy $ \pi(a | s) $ by optimizing the expected return through gradient ascent, without explicitly modeling the value function.
+- **Deep Q-Network (DQN)**: Approximates the state-action value function $Q(s, a)$ using a neural network, enabling the agent to select actions that maximize expected rewards.
+- **REINFORCE (Monte Carlo Policy Gradient)**: Directly learns the policy $\pi(a | s)$ by optimizing the expected return through gradient ascent, without explicitly modeling the value function.
 - **Deep Deterministic Policy Gradient (DDPG)**: An actor-critic method that concurrently learns a Q-function (critic) and a policy (actor) in a continuous action space, suitable for problems requiring fine control.
 
 ## Implementation
