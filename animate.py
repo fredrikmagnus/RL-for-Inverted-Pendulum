@@ -34,7 +34,7 @@ def run_episode(env, agent):
 
     return np.array(state_history)
 
-# Function to read episode data from the log
+
 def read_ep_from_log(file_path, ep_number):
     """
     Reads and parses the episode data from the specified log file.
@@ -68,7 +68,6 @@ def read_ep_from_log(file_path, ep_number):
     return np.array(episode_data['parsed_state'].tolist())
 
 
-# Function to animate the episode
 def animate_episode(state_history, config: Config):
     """
     Animates the pendulum episode given a state history.

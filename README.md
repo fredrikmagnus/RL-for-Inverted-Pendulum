@@ -27,7 +27,7 @@ The project is structured into several components:
 
 All three algorithms were tested on their ability to balance the pendulum starting from the upright position. The performance differences are evident in the animations below.
 
-| ![DDPG Balancing](./figures/animation_DDPG_up_good.gif) | ![DQN Balancing](./figures/animation_DQN_up_good.gif) | ![REINFORCE Balancing](./figures/animation_REINFORCE_up_good3.gif) |
+| ![DDPG Balancing](./figures/animation_DDPG_up_good.gif) | ![DQN Balancing](./figures/animation_DQN_up_good.gif) | ![REINFORCE Balancing](./figures/animation_REINFORCE_up_good.gif) |
 |:---:|:---:|:---:|
 | **DDPG** | **DQN** | **REINFORCE** |
 
