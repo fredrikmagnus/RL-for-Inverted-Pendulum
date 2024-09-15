@@ -18,8 +18,9 @@ The goal of this project is to swing up and balance the pendulum in the upright 
 The project is structured into several components:
 
 1. **Simulation Environment**: A physics-based simulation of the inverted pendulum on a cart, allowing for customizable parameters like mass, length, friction, and gravity.
-2. **RL Algorithms**: Implementations of DQN, REINFORCE, and DDPG algorithms, each with tailored neural network architectures and learning procedures.
+2. **RL Algorithms**: Implementations of DQN, REINFORCE, and DDPG algorithms, each with tailored architectures and learning procedures.
 3. **Visualization Tools**: Functions to animate and visualize the pendulum's behavior during training and testing, aiding in qualitative assessment.
+4. **Input Parameters**: Configurable hyperparameters and settings for the simulation and RL algorithms are structured in a single configuration file.
 
 ## Results
 
@@ -36,9 +37,11 @@ All three algorithms were tested on their ability to balance the pendulum starti
 
 ### Swinging Up from Downward Position
 
-The algorithms were also evaluated on their ability to swing the pendulum up from the downward position and maintain balance. The figure below illustrates the results achieved by the DDPG algorithm.
+The algorithms were also evaluated on their ability to swing the pendulum up from the downward position and maintain balance. Only the DDPG algorithm was able to achieve this task effectively. The animation below illustrates the performance of the DDPG algorithm in swinging up and balancing the pendulum.
 
 ![DDPG Swing-Up](./figures/DDPG_swingUp_best.gif)
 
-- **DDPG**: Successfully learned to swing up and balance the pendulum. The continuous action space was crucial for applying the nuanced forces required for this complex task.
-- **DQN** and **REINFORCE**: Were unable to achieve the swing-up due to the limitations inherent in their discrete action spaces.
+- **DDPG**: Successfully learned to swing up and balance the pendulum. Note, however, that the learning process was more challenging and unstable compared to balancing from the upright position. The agent would often deviate to a suboptimal policy and fail to recover after discovering the correct behavior.
+- **DQN** and **REINFORCE**: Were unable to achieve the swing-up task effectively. This is likely due to a combination of inherent limitations, such as the discrete action space, and the complexity of the task. However, it is likely possible to improve their performance with further tuning of the architecture and hyperparameters.
+
+
