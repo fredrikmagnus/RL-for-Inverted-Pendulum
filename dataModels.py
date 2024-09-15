@@ -3,7 +3,7 @@ from typing import List, Optional, Union, Literal
 import ruamel.yaml
 
 class TerminationParams(BaseModel):
-    angle_limit: Optional[float] = Field(None, description="Angle limit for the pendulum in degrees. Set to None for no limit.")
+    angle_limit: Optional[float] = Field(None, description="Angle limit for the pendulum in degrees. Set to None for no limit. Should only be set if initial_state is 'up'.")
     x_limit: Optional[float] = Field(None, description="X limit for the pendulum in meters. Set to None for no limit.")
     time_limit: Optional[float] = Field(None, description="Time limit for the episode in seconds. Set to None for no limit.")
     termination_penalty: float = Field(-20, description="Penalty for terminating the episode early.")

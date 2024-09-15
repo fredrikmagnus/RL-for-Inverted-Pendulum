@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load the CSV file
-file_path = 'logs/DDPG_try16.csv'  # Replace with the path to your CSV file
+file_path = ''  # Replace with the path to the CSV log file
 data = pd.read_csv(file_path)
 
 # Calculate the total reward for each episode
