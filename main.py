@@ -13,7 +13,7 @@ animate_params = config.animate
 pendulum_params = config.pendulum
 model_params = config.model
 
-env = Pendulum(config=pendulum_params)
+env = Pendulum(config=config)
 
 if model_params.type == 'REINFORCE':
     agent = REINFORCEAgent(config=model_params)

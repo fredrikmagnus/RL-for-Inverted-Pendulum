@@ -4,9 +4,7 @@ import matplotlib.animation as animation
 import numpy as np
 import re
 from matplotlib.patches import Rectangle
-from pendulum import Pendulum
-from models import REINFORCEAgent, DQNAgent, DDPGAgent
-from dataModels import AnimateParams, Config
+from dataModels import Config
 
 def run_episode(env, agent):
     """
@@ -17,7 +15,7 @@ def run_episode(env, agent):
     - agent (DDPGAgent, DQNAgent, REINFORCEAgent): The agent object to act in the environment.
     """
     print("Running episode...")
-    
+
     # Disable noise and exploration for testing
     agent.enable_noise = False
     agent.eps = 0.
@@ -154,13 +152,3 @@ def animate_episode(state_history, config: Config):
     plt.show()
     plt.close(fig)
 
-
-# # Main script to run the functions
-# file_path = 'logs/DDPG_try4_1m2xlim.csv'  # Replace with the correct path to your CSV file
-# ep_number = -2  # Replace with the episode number you want to visualize
-
-# # Read and parse the episode data
-# state_history = read_ep_from_log(file_path, ep_number)
-
-# # Animate the episode
-# animate_episode(state_history)
