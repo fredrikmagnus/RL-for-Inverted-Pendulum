@@ -2,6 +2,8 @@
 
 This project explores the application of various reinforcement learning (RL) algorithms to the classic inverted pendulum problem. The inverted pendulum is a common challenge in control theory, involving balancing a pendulum upright on a moving cart by applying appropriate horizontal forces. This setup serves as an excellent testbed for experimenting with RL algorithms in a practical setting.
 
+The environment is illustrated below and consists of a massless rod attached to a pivot point on a cart. The pendulum bob has a certain mass, and the cart can move horizontally. The system is influenced by the forces applied to the cart, which affect the pendulum's angular position and velocity.
+
 ![Pendulum Illustration](./figures/PendulumFig.svg)
 
 ## Overview
