@@ -94,6 +94,26 @@ class Pendulum:
         
         self.state[4] = self.state[4] % (2*np.pi) # Keep angle between 0 and 2pi
 
+    def get_state_representation(self, state):
+        # state = self.state[[0, 2, 4, 5]] # Extract the x_pos, x_vel, angle, angle_vel (ignore y-values)
+        x_pos = state[0]
+        x_vel = state[2]
+        angle = state[4]
+        angle_vel = state[5]
+
+        x_pos = x_pos / self.x_lim if self.x_lim is not None else x_pos # Normalize x_pos
+
+        max_x_vel = 7
+        x_vel = x_vel / max_x_vel # Normalize x_vel
+
+        max_angle_vel = 7
+        angle_vel = angle_vel / max_angle_vel # Normalize angle_vel
+
+        # state = np.array([state[0], state[1], np.cos(state[2]), np.sin(state[2]), state[3]]) # Convert angle to sin and cos signal
+        state = np.array([x_pos, x_vel, np.cos(angle), np.sin(angle), angle_vel]) # Convert angle to sin and cos signal
+        state = np.reshape(state, (1,5)) # Reshape to (1,5)
+        return state
+
         
 
     def reset(self):
@@ -114,6 +134,33 @@ class Pendulum:
         return self.state
     
     def reward(self, force=None):
+        # Constants
+        angle = self.state[4] - np.pi/2  # Deviation from upright
+        angle = (angle + np.pi) % (2 * np.pi) - np.pi  # Normalize to [-pi, pi]
+        angular_velocity = self.state[5]
+        x_position = self.state[0] / self.x_lim if self.x_lim is not None else self.state[0]
+        # x_velocity = self.state[2]
+        angular_velocity_norm = angular_velocity / 7  # Normalize angular velocity to [-1, 1]
+        # Reward components
+        # upright_reward = 0 #np.cos(angle)  # +1 when upright, -1 when inverted
+        # velocity_penalty = 0 #-0.01 * (angular_velocity ** 2)  # Penalize high angular velocity
+        # position_penalty = 0 #-0.1 * (x_position ** 2)  # Penalize being far from center
+        force_penalty = -0.01 * ((force[0]/25) ** 2)  # Penalize excessive force
+
+        # Compute the combined deviation from the goal state
+        deviation = np.sqrt((angle/np.pi)**2 + angular_velocity_norm**2 + x_position**2)
+
+        # Gaussian reward centered at deviation = 0 (upright and stationary)
+        sigma = 0.3  # Controls the width of the peak; adjust as needed
+        stability = np.exp(- (deviation**2) / (2 * sigma**2))
+
+        # Total reward
+        total_reward = stability + force_penalty # upright_reward + velocity_penalty + position_penalty + force_penalty + stability
+
+        # Adjust reward to be positive
+        # total_reward += 1  # Shift rewards to be mostly positive
+
+        return total_reward
 
         # Reward function:
         # First we have a reward for increasing the height of the bob. 
@@ -125,42 +172,42 @@ class Pendulum:
         # This scaling factor is S_max at the center and decreases exponentially towards S_min when x = x_lim.
         # S(x) = (S_max - S_min) * exp(-k * abs(x)) * sin(pi/2 - pi/(2*x_lim) * abs(x)) + S_min 
 
-        # 1) Convert the angle to the range [-pi, pi] with 0 being the vertical position
-        angle = self.state[4] - np.pi/2 # make 0 the vertical position
-        # Convert angle to range -pi to pi
-        if angle > np.pi:
-            angle -= 2*np.pi
-        x = self.state[0] # x position of the base
-        angular_vel = self.state[5] # Angular velocity
+        # # 1) Convert the angle to the range [-pi, pi] with 0 being the vertical position
+        # angle = self.state[4] - np.pi/2 # make 0 the vertical position
+        # # Convert angle to range -pi to pi
+        # if angle > np.pi:
+        #     angle -= 2*np.pi
+        # x = self.state[0] # x position of the base
+        # angular_vel = self.state[5] # Angular velocity
 
-        # State vector [x_pos, y_pos, x_vel, y_vel, angle, ang_vel]
-        # 2) Calculate the reward for the angle
-        R_max = 1
-        n = 1.5
-        # k = 0.5
-        # angle_reward = R_max * np.exp(-k * np.abs(angle)) * np.sin((np.pi - np.abs(angle)) / 2)
-        angle_reward = R_max * (1 - (np.abs(angle) / np.pi) ** n) # Reward for being upright
+        # # State vector [x_pos, y_pos, x_vel, y_vel, angle, ang_vel]
+        # # 2) Calculate the reward for the angle
+        # R_max = 1
+        # n = 1.5
+        # # k = 0.5
+        # # angle_reward = R_max * np.exp(-k * np.abs(angle)) * np.sin((np.pi - np.abs(angle)) / 2)
+        # angle_reward = R_max * (1 - (np.abs(angle) / np.pi) ** n) # Reward for being upright
 
         
 
-        # 3) Calculate the scaling for the x position
-        S_max = 1
-        S_min = 0.2
-        k = 1
-        x_pos_scaling = (S_max - S_min) * np.exp(-k * np.abs(x)) * np.sin(np.pi/2 - np.pi/(2*self.x_lim) * np.abs(x)) + S_min
+        # # 3) Calculate the scaling for the x position
+        # S_max = 1
+        # S_min = 0.2
+        # k = 1
+        # x_pos_scaling = (S_max - S_min) * np.exp(-k * np.abs(x)) * np.sin(np.pi/2 - np.pi/(2*self.x_lim) * np.abs(x)) + S_min
 
 
-        # 4) Penalize high angular velocity.
-        # We add a penalty for high angular velocity using a scaling of the reward based on the angular velocity.
-        # This scaling is 1 at 0 angular velocity and decreases exponentially towards 0 as the angular velocity increases.
-        angular_vel_scaling = np.exp(-np.abs(self.state[5])/5)
+        # # 4) Penalize high angular velocity.
+        # # We add a penalty for high angular velocity using a scaling of the reward based on the angular velocity.
+        # # This scaling is 1 at 0 angular velocity and decreases exponentially towards 0 as the angular velocity increases.
+        # angular_vel_scaling = np.exp(-np.abs(self.state[5])/5)
 
-        R_goal = 0.25 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
+        # R_goal = 0.25 if np.abs(angle) < 0.25 and np.abs(angular_vel) < 0.5 else 0 # Reward for being close to the top and having low angular velocity
 
-        Penalty_force = 0 if force is None else -0.005 * np.linalg.norm(force) # Penalty for using force
+        # Penalty_force = 0 # if force is None else -0.005 * np.linalg.norm(force) # Penalty for using force
         
-        # 5) Calculate the total reward
-        return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal + Penalty_force
+        # # 5) Calculate the total reward
+        # return angle_reward * x_pos_scaling * angular_vel_scaling + R_goal + Penalty_force
 
 
         # R_theta = -1/np.pi**2 * angle**2 # Penalty for being far from the top
@@ -182,7 +229,7 @@ class Pendulum:
         """
 
         if self.logging:
-            self.episode_log.append((self.state.copy(), force[0], self.reward())) # Log the state-action pair
+            self.episode_log.append((self.state.copy(), force[0], self.reward(force))) # Log the state-action pair
 
         self.update(force)
         reward = self.reward(force)

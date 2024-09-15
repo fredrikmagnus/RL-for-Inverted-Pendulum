@@ -423,7 +423,7 @@ class DDPGAgent:
         
         for e in range(num_episodes):
             state = env.reset()
-            state = self.get_state_representation(state)
+            state = env.get_state_representation(state)
             episode_reward = 0
             time_step = 0
             done = False
@@ -431,7 +431,7 @@ class DDPGAgent:
             while not done:
                 force, action = self.act(state)
                 next_state, reward, done = env.step(force)
-                next_state = self.get_state_representation(next_state)
+                next_state = env.get_state_representation(next_state)
                 episode_reward += reward
                 self.remember(state, action, reward, next_state, done)
                 if done:
