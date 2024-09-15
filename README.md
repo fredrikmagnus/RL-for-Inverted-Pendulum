@@ -42,6 +42,6 @@ The algorithms were also evaluated on their ability to swing the pendulum up fro
 ![DDPG Swing-Up](./figures/DDPG_swingUp_best.gif)
 
 - **DDPG**: Successfully learned to swing up and balance the pendulum. Note, however, that the learning process was more challenging and unstable compared to balancing from the upright position. The agent would often deviate to a suboptimal policy and fail to recover after discovering the correct behavior.
-- **DQN** and **REINFORCE**: Were unable to achieve the swing-up task effectively. This is likely due to a combination of inherent limitations, such as the discrete action space, and the complexity of the task. However, it is likely possible to improve their performance with further tuning of the architecture and hyperparameters.
+- **DQN** and **REINFORCE**: Were unable to achieve the swing-up task effectively. This is likely due to a combination of inherent limitations (such as the discrete action space) and the need for more tuning of hyperparameters. It is likely possible to improve their performance with further tuning of the architecture and hyperparameters.
 
 
